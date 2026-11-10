@@ -36,17 +36,17 @@ with st.form("parallel_world_survey"):
 
     with tabs[0]:
         st.subheader("PART 0. 지금의 나")
-        p0_q1 = st.text_input("1. 소설 속에서 사용할 이름 / 닉네임", placeholder="예: 이도")
+        p0_q1 = st.text_input("1. 소설 속에서 사용할 이름 / 닉네임", placeholder="예: 이선민")
         col1, col2 = st.columns(2)
         with col1:
             p0_q2 = st.number_input("2. 현재 나이", min_value=10, max_value=100, value=25)
         with col2:
             p0_q3 = st.selectbox("3. 성별", ["남성", "여성", "기타", "답하고 싶지 않음"])
         p0_q4_type = st.selectbox("4. 현재 하고 있는 일", ["대학생", "직장인", "취업준비 중", "프리랜서", "자영업", "기타"])
-        p0_q4_detail = st.text_input("4-1. 구체적인 일상이나 역할", placeholder="예: 연구실 실험과 취업 준비 병행 중")
-        p0_q5 = st.text_input("5. 전공 또는 가장 오래 공부한 분야", placeholder="예: 화학공학")
+        p0_q4_detail = st.text_input("4-1. 구체적인 일상이나 역할", placeholder="예: 학업과 취업 준비 병행 중")
+        p0_q5 = st.text_input("5. 전공 또는 가장 오래 공부한 분야", placeholder="예: 경영학")
         p0_q6 = st.text_input("6. 현재 살고 있는 곳 (국가와 도시)", placeholder="예: 대한민국 서울")
-        p0_q7 = st.text_input("7. 지금의 내 삶을 한 문장으로 표현한다면?", placeholder="예: 새로운 시작을 준비하며 잠시 숨을 고르는 시기다.")
+        p0_q7 = st.text_input("7. 지금의 내 삶을 한 문장으로 표현한다면?", placeholder="예: 열심히는 하지만 약간의 회의감이 든다.")
 
     with tabs[1]:
         st.subheader("PART 1. 나는 어떤 사람인가?")
