@@ -144,23 +144,33 @@ if submit_btn:
     [PART 5] 첫질문(P5_Q22): {p5_q22} / 공통점(P5_Q23): {p5_q23}
     """
 
-    with st.spinner(f"'{p2_q13 or '기억의 조각'}'에 깃든 두 세계의 시간을 엮어내는 중입니다..."):
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",  # 빠른 테스트용 (추후 gemini-2.5-pro 로 변경 가능)
+    st.markdown("---")
+    st.info("✍️ 두 세계의 기록을 실시간으로 적어 내려가는 중입니다...")
+
+    novel_area = st.empty()
+    full_text = ""
+
+    try:
+        # 스트리밍 호출
+        response_stream = client.models.generate_content_stream(
+            model="gemini-3.8-flash",
             contents=user_data,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
-                temperature=0.9,
-            )
+                temperature=0.85,
+            ),
         )
-        full_output = response.text
 
-        if "[소설시작]" in full_output:
-            design_note, novel_text = full_output.split("[소설시작]", 1)
-        else:
-            design_note, novel_text = "", full_output
+        # 들어오는 즉시 글자를 그대로 화면에 표시 (중간에 멈추는 일 방지)
+        for chunk in response_stream:
+            if chunk.text:
+                full_text += chunk.text
+                novel_area.markdown(
+                    f'<div class="novel-box">{full_text}</div>',
+                    unsafe_allow_html=True,
+                )
 
-    st.markdown(f'<div class="novel-box">{novel_text.strip()}</div>', unsafe_allow_html=True)
+        st.success("✨ 가능세계의 기록이 완성되었습니다.")
 
-    with st.expander("🔍 AI 서사 설계 노트 확인 (개발자 테스트용)"):
-        st.text(design_note.strip())
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
