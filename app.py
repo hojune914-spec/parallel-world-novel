@@ -144,33 +144,43 @@ if submit_btn:
     [PART 5] 첫질문(P5_Q22): {p5_q22} / 공통점(P5_Q23): {p5_q23}
     """
 
-    st.markdown("---")
-    st.info("✍️ 두 세계의 기록을 실시간으로 적어 내려가는 중입니다...")
+    status_holder = st.empty()
+    status_holder.info("✍️ 가능세계의 시공간을 조율하고 소설을 적어 내려가는 중입니다...")
 
     novel_area = st.empty()
     full_text = ""
+    is_started = False
 
-    try:
-        # 스트리밍 호출
-        response_stream = client.models.generate_content_stream(
-            model="gemini-3.8-flash",
-            contents=user_data,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0.85,
-            ),
-        )
+    # 스트리밍 호출
+    response_stream = client.models.generate_content_stream(
+        model="gemini-3.8-flash",  # 혹은 "gemini-2.5-pro"
+        contents=user_data,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.85,
+        ),
+    )
 
-        # 들어오는 즉시 글자를 그대로 화면에 표시 (중간에 멈추는 일 방지)
-        for chunk in response_stream:
-            if chunk.text:
-                full_text += chunk.text
+    for chunk in response_stream:
+        if chunk.text:
+            full_text += chunk.text
+            
+            # [소설시작] 태그가 등장한 이후부터 본문만 화면에 실시간 출력
+            if "[소설시작]" in full_text:
+                if not is_started:
+                    is_started = True
+                    status_holder.empty()  # 상단 로딩바 제거
+                
+                novel_body = full_text.split("[소설시작]", 1)[1]
                 novel_area.markdown(
-                    f'<div class="novel-box">{full_text}</div>',
+                    f'<div class="novel-box">{novel_body}</div>',
                     unsafe_allow_html=True,
                 )
 
-        st.success("✨ 가능세계의 기록이 완성되었습니다.")
-
-    except Exception as e:
-        st.error(f"오류가 발생했습니다: {e}")
+    # 생성이 완전히 끝난 후 설계도는 접어두기 칸으로 이동
+    if "[소설시작]" in full_text:
+        parts = full_text.split("[소설시작]", 1)
+        design_note = parts[0].replace("[설계도]", "").strip()
+        
+        with st.expander("🔍 AI 서사 설계 노트 (작성 과정 보기)"):
+            st.text(design_note)
