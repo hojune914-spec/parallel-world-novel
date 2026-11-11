@@ -1,4 +1,5 @@
 # app.py
+import re
 import time
 import streamlit as st
 import streamlit.components.v1 as components
@@ -7,9 +8,9 @@ from google.genai import types
 from prompts import SYSTEM_PROMPT
 
 # 1. 페이지 기본 설정
-st.set_page_config(page_title="나의 가능세계", page_icon="🕯️", layout="centered")
+st.set_page_config(page_title="나의 가능세계", page_icon="📖", layout="centered")
 
-# 2. 어두운 등불 & 시네마틱 고서 테마 CSS
+# 2. 어두운 등불 & 시네마틱 고서 테마 CSS + 좌측 상단 소설책 픽토그램 스타일
 st.markdown("""
 <style>
 @import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
@@ -18,6 +19,11 @@ st.markdown("""
 @keyframes candleFlicker {
     0%, 100% { opacity: 0.92; transform: scale(1); filter: drop-shadow(0 0 12px rgba(212, 154, 73, 0.6)); }
     50% { opacity: 1; transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(235, 175, 85, 0.9)); }
+}
+
+@keyframes floatSlow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-4px); }
 }
 
 @keyframes fadeInSlow {
@@ -41,6 +47,62 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
     color: #e6dfd5 !important;
 }
 
+/* 화면 왼쪽 위 고정 소설책 픽토그램 엠블럼 */
+.top-left-book-emblem {
+    position: fixed;
+    top: 58px;
+    left: 28px;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(26, 21, 16, 0.92) 0%, rgba(15, 12, 9, 0.85) 100%);
+    border: 1px solid rgba(200, 150, 75, 0.38);
+    border-left: 3px solid #c8964b;
+    border-radius: 6px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.75), 0 0 18px rgba(200, 150, 75, 0.12);
+    pointer-events: none;
+    animation: floatSlow 5s infinite ease-in-out;
+}
+
+.top-left-book-emblem svg {
+    width: 34px;
+    height: 34px;
+    filter: drop-shadow(0 0 8px rgba(212, 154, 73, 0.45));
+}
+
+.emblem-text-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.emblem-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f3e2b3 !important;
+    letter-spacing: 1.5px;
+    line-height: 1.2;
+}
+
+.emblem-sub {
+    font-size: 0.68rem;
+    color: #a89478 !important;
+    letter-spacing: 0.8px;
+    margin-top: 2px;
+}
+
+/* 모바일 등 좁은 화면에서는 상단 인라인 배지로 전환 */
+@media (max-width: 1100px) {
+    .top-left-book-emblem {
+        position: relative;
+        top: 0;
+        left: 0;
+        margin-bottom: 14px;
+        width: fit-content;
+    }
+}
+
 /* 입장 페이지 전체 래퍼 */
 .intro-wrapper {
     background: #120f0c;
@@ -54,7 +116,7 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
     animation: fadeInSlow 1.2s ease-out;
 }
 
-/* 상단 히어로 배너 이미지 (서재/등불 무드 + 하단 그라데이션 페이드) */
+/* 상단 히어로 배너 이미지 */
 .hero-banner {
     position: relative;
     width: 100%;
@@ -95,13 +157,11 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
     font-style: italic;
 }
 
-/* 본문 컨텐츠 영역 */
 .intro-content {
     padding: 15px 38px 40px 38px;
     text-align: center;
 }
 
-/* 에피그래프(소설 서문 인용구) */
 .epigraph-box {
     margin: 10px auto 30px auto;
     padding: 14px 20px;
@@ -183,7 +243,6 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
     word-break: keep-all;
 }
 
-/* 하단 안내 박스 */
 .intro-guide {
     background-color: rgba(200, 150, 75, 0.06);
     border: 1px solid rgba(200, 150, 75, 0.2);
@@ -261,15 +320,35 @@ button[kind="secondary"]:hover {
     color: #231e18 !important;
 }
 </style>
+
+<!-- 화면 왼쪽 위 고정 소설책 픽토그램 -->
+<div class="top-left-book-emblem">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#e2b86b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="rgba(200, 150, 75, 0.12)"/>
+        <path d="M32 16V52" stroke="#e2b86b" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M12 22C17 20.5 23 21 27 23.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M12 30C17 28.5 23 29 27 31.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M12 38C17 36.5 23 37 27 39.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M52 22C47 20.5 41 21 37 23.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M52 30C47 28.5 41 29 37 31.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M52 38C47 36.5 41 37 37 39.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="32" cy="8" r="2.2" fill="#f6e7c1"/>
+        <path d="M32 3V5M26 7L28 8M38 7L36 8" stroke="#f6e7c1" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <div class="emblem-text-group">
+        <span class="emblem-title">가능세계 서재</span>
+        <span class="emblem-sub">NOVEL ARCHIVE</span>
+    </div>
+</div>
 """, unsafe_allow_html=True)
 
 # 3. 제미나이 클라이언트 연결
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 4. 세션 상태 초기화
+# 4. 세션 상태 초기화 (p0_q4_custom 추가)
 DEFAULT_KEYS = {
     "p0_q1": "", "p0_q2": 25, "p0_q3": None, "p0_q4_type": None,
-    "p0_q4_detail": "", "p0_q5": "", "p0_q6": "", "p0_q7": "",
+    "p0_q4_custom": "", "p0_q4_detail": "", "p0_q5": "", "p0_q6": "", "p0_q7": "",
     "p1_q1": None, "p1_q2": None, "p1_q3": None, "p1_q3_reason": "",
     "p1_q4": None, "p1_q5": None, "p1_q6": [], "p1_q7": None,
     "p1_q8": "", "p1_q9": "", "p1_q10": None, "p1_q10_reason": "",
@@ -297,6 +376,8 @@ if "novel_result" not in st.session_state:
     st.session_state.novel_result = None
 if "design_note" not in st.session_state:
     st.session_state.design_note = None
+if "step_warning" not in st.session_state:
+    st.session_state.step_warning = None
 
 if st.session_state.scroll_to_top:
     components.html(
@@ -305,9 +386,115 @@ if st.session_state.scroll_to_top:
     )
     st.session_state.scroll_to_top = False
 
+
+# ─────────────────────────────────────────────────────────
+# 유효성 및 성실도(50% 이상) 검증 함수
+# ─────────────────────────────────────────────────────────
+def is_sincere_text(val, min_len=2):
+    """빈칸이거나 의미 없는 단답(ㅋㅋ, ㅇㅇ, 특수문자만 반복 등)인지 검사"""
+    if not val or not isinstance(val, str):
+        return False
+    cleaned = val.strip()
+    if len(cleaned) < min_len:
+        return False
+    # 자음/모음만 반복되거나(ㅋㅋㅋ, ㅇㅇ 등) 특수문자/숫자만 있는 경우 불성실로 판별
+    if re.fullmatch(r"[ㄱ-ㅎㅏ-ㅣ\W_]+", cleaned):
+        return False
+    # 똑같은 글자만 2번 이상 반복된 경우 (예: '아아', '111')
+    if len(set(cleaned.replace(" ", ""))) == 1 and len(cleaned) >= 2:
+        return False
+    return True
+
+
+def check_part0_other_job_valid():
+    """'현재 하고 있는 일'에서 '기타'를 선택했을 때 직접 입력란을 채웠는지 검사"""
+    if st.session_state.p0_q4_type == "기타":
+        if not st.session_state.p0_q4_custom or not st.session_state.p0_q4_custom.strip():
+            return False
+    return True
+
+
+def evaluate_survey_sincerity():
+    """전체 핵심 문항(22개, 기본값 고정인 나이 제외)의 성실 응답률 및 부족한 파트 계산"""
+    s = st.session_state
+
+    # 4번 문항('기타' 선택 시 직접 입력값까지 있어야 인정)
+    q4_valid = (
+        is_sincere_text(s.p0_q4_custom, min_len=1)
+        if s.p0_q4_type == "기타"
+        else (s.p0_q4_type is not None)
+    )
+
+    part_checks = {
+        "PART 0. 기본": [
+            is_sincere_text(s.p0_q1, min_len=1),
+            s.p0_q3 is not None,
+            q4_valid,
+            is_sincere_text(s.p0_q5, min_len=2),
+            is_sincere_text(s.p0_q6, min_len=2),
+            is_sincere_text(s.p0_q7, min_len=3),
+        ],
+        "PART 1. 성향": [
+            s.p1_q1 is not None,
+            s.p1_q2 is not None,
+            s.p1_q3 is not None,
+            s.p1_q4 is not None,
+            s.p1_q5 is not None,
+            len(s.p1_q6) > 0,
+            s.p1_q7 is not None,
+            is_sincere_text(s.p1_q8, min_len=3),
+            is_sincere_text(s.p1_q9, min_len=3),
+            s.p1_q10 is not None,
+        ],
+        "PART 2. 기억": [
+            is_sincere_text(s.p2_q11, min_len=4),
+            is_sincere_text(s.p2_q12, min_len=4),
+            is_sincere_text(s.p2_q13, min_len=2),
+            s.p2_q14 is not None,
+        ],
+        "PART 3. 현재 미래": [
+            is_sincere_text(s.p3_q15, min_len=4),
+            s.p3_q16 is not None,
+            is_sincere_text(s.p3_q17, min_len=3),
+        ],
+        "PART 4. 다른 길": [
+            is_sincere_text(s.p4_q18, min_len=4),
+            is_sincere_text(s.p4_q19, min_len=2),
+            s.p4_q20 is not None,
+            s.p4_q21 is not None,
+        ],
+        "PART 5. 조우": [
+            is_sincere_text(s.p5_q22, min_len=3),
+            is_sincere_text(s.p5_q23, min_len=2),
+        ],
+    }
+
+    total_items = 0
+    filled_items = 0
+    weak_parts = []
+
+    for part_name, results in part_checks.items():
+        part_total = len(results)
+        part_filled = sum(1 for r in results if r)
+        total_items += part_total
+        filled_items += part_filled
+        if part_filled < (part_total / 2):
+            weak_parts.append(part_name)
+
+    ratio = filled_items / total_items if total_items > 0 else 0.0
+    return ratio, filled_items, total_items, weak_parts
+
+
 def go_to_step(step_idx):
+    # PART 0에서 다른 파트로 이동하려 할 때 '기타' 미입력 시 이동 차단
+    if st.session_state.current_step == 0 and step_idx > 0:
+        if not check_part0_other_job_valid():
+            st.session_state.step_warning = "⚠️ '4. 현재 하고 있는 일'에서 '기타'를 선택하셨습니다. 아래 칸에 현재 하고 있는 일을 직접 입력하셔야 다음 단계로 넘어갈 수 있습니다."
+            return
+    st.session_state.step_warning = None
     st.session_state.current_step = step_idx
     st.session_state.scroll_to_top = True
+
 
 def reset_all():
     for k, default_val in DEFAULT_KEYS.items():
@@ -316,10 +503,12 @@ def reset_all():
     st.session_state.novel_result = None
     st.session_state.design_note = None
     st.session_state.generate_trigger = False
+    st.session_state.step_warning = None
     st.session_state.scroll_to_top = True
 
+
 # ─────────────────────────────────────────────────────────
-# [화면 A] 시네마틱 입장 페이지 (이미지 + 분위기 연출)
+# [화면 A] 시네마틱 입장 페이지
 # ─────────────────────────────────────────────────────────
 if not st.session_state.entered:
     intro_html = """
@@ -369,7 +558,7 @@ if not st.session_state.entered:
 </div>
 <div class="intro-guide">
 <b>📖 기록을 시작하기 전에</b><br>
-• 총 6개 파트(23개 문항)로 구성되어 있으며, 작성에는 <b>약 5~7분</b>이 소요됩니다.<br>
+• 총 6개 파트(23개 문항)로 구성되어 있으며, <b>최소 절반(50%) 이상의 문항</b>을 성실히 채워주셔야 소설이 집필됩니다.<br>
 • 주관식 문항에 추상적인 표현 대신 <b>구체적인 장면, 소리, 냄새, 사물의 촉감</b>을 적어주실수록 밀도 높은 소설이 완성됩니다.<br>
 • 입력하신 모든 기록은 소설 집필 즉시 휘발되며 서버에 저장되지 않습니다.
 </div>
@@ -389,7 +578,7 @@ if not st.session_state.entered:
 else:
     top_col1, top_col2 = st.columns([3, 1])
     with top_col1:
-        st.title("🕯️ 나의 가능세계")
+        st.title("📖 나의 가능세계")
         st.caption("지금의 내가 계속 걸어간 미래와, 다른 선택을 했다면 존재했을 나")
     with top_col2:
         if st.button("🚪 표지로 돌아가기", use_container_width=True):
@@ -425,6 +614,10 @@ else:
     st.progress((st.session_state.current_step + 1) / len(PART_TITLES))
     st.markdown("---")
 
+    # 단계 이동 경고 메시지 출력
+    if st.session_state.step_warning:
+        st.warning(st.session_state.step_warning)
+
     step = st.session_state.current_step
 
     if step == 0:
@@ -435,7 +628,22 @@ else:
             st.number_input("2. 현재 나이", min_value=10, max_value=100, key="p0_q2")
         with col2:
             st.selectbox("3. 성별", ["남성", "여성", "기타", "답하고 싶지 않음"], index=None, placeholder="선택해주세요", key="p0_q3")
-        st.selectbox("4. 현재 하고 있는 일", ["대학생", "직장인", "취업준비 중", "프리랜서", "자영업", "기타"], index=None, placeholder="선택해주세요", key="p0_q4_type")
+
+        # 4. 현재 하고 있는 일 ('기타' 선택 시 조건부 직접 입력창 노출)
+        st.selectbox(
+            "4. 현재 하고 있는 일",
+            ["대학생", "직장인", "취업 준비 중", "프리랜서", "자영업", "기타"],
+            index=None,
+            placeholder="선택해주세요",
+            key="p0_q4_type",
+        )
+        if st.session_state.p0_q4_type == "기타":
+            st.text_input(
+                "현재 하고 있는 일을 직접 입력해주세요.",
+                placeholder="현재 하고 있는 일을 직접 입력해주세요.",
+                key="p0_q4_custom",
+            )
+
         st.text_input("4-1. 구체적인 일상이나 역할", placeholder="예: 학업과 취업 준비 병행 중", key="p0_q4_detail")
         st.text_input("5. 전공 또는 가장 오래 공부한 분야", placeholder="예: 경영학", key="p0_q5")
         st.text_input("6. 현재 살고 있는 곳 (국가와 도시)", placeholder="예: 대한민국 서울", key="p0_q6")
@@ -529,7 +737,7 @@ else:
 
     st.markdown("---")
 
-    # 파트 하단 이동 버튼
+    # 파트 하단 이동 버튼 및 최종 제출 검증
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         if step > 0:
@@ -543,15 +751,39 @@ else:
                 st.rerun()
         else:
             if st.button("🕯️ 나의 가능세계 기록 펼치기", type="primary", use_container_width=True):
-                st.session_state.generate_trigger = True
+                # 1차 검사: PART 0 '기타' 선택 후 미입력 여부 확인
+                if not check_part0_other_job_valid():
+                    st.warning(
+                        "⚠️ **PART 0의 '4. 현재 하고 있는 일'**에서 **'기타'**를 선택하셨으나 내용을 입력하지 않으셨습니다. "
+                        "PART 0으로 돌아가 현재 하고 있는 일을 직접 입력해 주세요."
+                    )
+                else:
+                    # 2차 검사: 50% 이상 성실 응답 여부 확인
+                    ratio, filled_cnt, total_cnt, weak_parts = evaluate_survey_sincerity()
+                    if ratio < 0.5:
+                        weak_str = ", ".join(weak_parts) if weak_parts else "전체 파트"
+                        st.error(
+                            f"🕯️ **아직 가능세계의 문을 열기에 단서가 부족합니다.** (현재 성실 답변율: **{int(ratio * 100)}%** / 최소 **50%** 필요)\n\n"
+                            f"비어 있거나 너무 짧게(단답·자음 등) 작성된 문항이 많으면 소설이 생성되지 않습니다. "
+                            f"특히 **[{weak_str}]**의 빈칸이나 불성실한 답변을 조금만 더 구체적으로 채워주시길 부탁드립니다."
+                        )
+                    else:
+                        st.session_state.generate_trigger = True
 
     # 소설 생성 및 단계별 진행 표시 + 실시간 타자기 출력
     if st.session_state.generate_trigger:
         st.session_state.generate_trigger = False
         s = st.session_state
 
+        # '기타'를 선택한 경우 사용자가 직접 입력한 직업을 최종 데이터로 저장 및 반영
+        final_job_type = (
+            s.p0_q4_custom.strip()
+            if s.p0_q4_type == "기타"
+            else s.p0_q4_type
+        )
+
         user_data = f"""
-        [PART 0] 이름: {s.p0_q1} / 나이: {s.p0_q2} / 성별: {s.p0_q3} / 현재 일: {s.p0_q4_type}({s.p0_q4_detail}) / 전공: {s.p0_q5} / 거주지: {s.p0_q6} / 현재 한 문장: {s.p0_q7}
+        [PART 0] 이름: {s.p0_q1} / 나이: {s.p0_q2} / 성별: {s.p0_q3} / 현재 일: {final_job_type}({s.p0_q4_detail}) / 전공: {s.p0_q5} / 거주지: {s.p0_q6} / 현재 한 문장: {s.p0_q7}
         [PART 1] 편안한 공간(P1_Q1): {s.p1_q1} / 문제해결(P1_Q2): {s.p1_q2} / 선택기준(P1_Q3): {s.p1_q3}({s.p1_q3_reason}) / 관계모습(P1_Q4): {s.p1_q4} / 방어기제(P1_Q5): {s.p1_q5} / 핵심가치(P1_Q6): {', '.join(s.p1_q6)} / 결핍(P1_Q7): {s.p1_q7} / 열망(P1_Q8): {s.p1_q8} / 타인시선차이(P1_Q9): {s.p1_q9} / 중요한사람(P1_Q10): {s.p1_q10}({s.p1_q10_reason})
         [PART 2] 변곡점(P2_Q11): {s.p2_q11} / 성취기억(P2_Q12): {s.p2_q12} / 오브제(P2_Q13): {s.p2_q13} / 성장흔적(P2_Q14): {s.p2_q14}({s.p2_q14_reason})
         [PART 3] 현재목표(P3_Q15): {s.p3_q15} / 두려움(P3_Q16): {s.p3_q16} / 잃고싶지않은가치(P3_Q17): {s.p3_q17}
