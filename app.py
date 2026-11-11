@@ -9,79 +9,196 @@ from prompts import SYSTEM_PROMPT
 # 1. 페이지 기본 설정
 st.set_page_config(page_title="나의 가능세계", page_icon="🕯️", layout="centered")
 
-# 2. 어두운 등불 & 소설책 질감 커스텀 CSS
+# 2. 어두운 등불 & 시네마틱 고서 테마 CSS
 st.markdown("""
 <style>
 @import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
 
-/* 전체 배경: 어두운 서재 + 상단 등불 후광 효과 */
+/* 등불 일렁임 애니메이션 */
+@keyframes candleFlicker {
+    0%, 100% { opacity: 0.92; transform: scale(1); filter: drop-shadow(0 0 12px rgba(212, 154, 73, 0.6)); }
+    50% { opacity: 1; transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(235, 175, 85, 0.9)); }
+}
+
+@keyframes fadeInSlow {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 전체 배경: 어두운 서재 + 상단 등불 후광 */
 .stApp {
-    background-color: #0e0c0a;
+    background-color: #0b0907;
     background-image: 
-        radial-gradient(circle at 50% 12%, rgba(212, 154, 73, 0.16) 0%, rgba(14, 12, 10, 0.96) 65%),
+        radial-gradient(circle at 50% 8%, rgba(212, 154, 73, 0.18) 0%, rgba(11, 9, 7, 0.97) 60%),
         repeating-linear-gradient(45deg, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 2px, transparent 2px, transparent 4px);
     color: #e6dfd5;
     font-family: 'MaruBuri', serif;
 }
 
-/* 기본 타이포그래피 명조체 통일 및 색상 조정 */
+/* 기본 타이포그래피 명조체 통일 */
 h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTextInput label, .stTextArea label, .stNumberInput label, .stMultiSelect label {
     font-family: 'MaruBuri', serif !important;
     color: #e6dfd5 !important;
 }
 
-/* 입장 페이지(표지) 카드 디자인 */
-.intro-card {
-    background: linear-gradient(180deg, rgba(28, 24, 20, 0.92) 0%, rgba(18, 15, 12, 0.96) 100%);
-    border: 1px solid #4a3b28;
+/* 입장 페이지 전체 래퍼 */
+.intro-wrapper {
+    background: #120f0c;
+    border: 1px solid #3d3020;
     border-top: 2px solid #c8964b;
-    border-radius: 6px;
-    padding: 55px 40px;
-    margin-top: 25px;
-    margin-bottom: 30px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(200, 150, 75, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 15px;
+    margin-bottom: 25px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(200, 150, 75, 0.08);
+    animation: fadeInSlow 1.2s ease-out;
+}
+
+/* 상단 히어로 배너 이미지 (서재/등불 무드 + 하단 그라데이션 페이드) */
+.hero-banner {
+    position: relative;
+    width: 100%;
+    height: 310px;
+    background-image: 
+        linear-gradient(to bottom, rgba(18, 15, 12, 0.25) 0%, rgba(18, 15, 12, 0.65) 65%, #120f0c 100%),
+        radial-gradient(circle at 50% 45%, rgba(225, 165, 75, 0.25) 0%, rgba(0, 0, 0, 0.7) 85%),
+        url('https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=1200&q=80');
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 20px;
     text-align: center;
-    line-height: 2.1;
+}
+
+.lantern-icon {
+    font-size: 2.6rem;
+    margin-bottom: 6px;
+    animation: candleFlicker 3.5s infinite ease-in-out;
 }
 
 .intro-title {
-    font-size: 2.2rem;
+    font-size: 2.35rem;
     font-weight: 700;
-    color: #f3e5ab !important;
-    letter-spacing: 2px;
-    margin-bottom: 8px;
-    text-shadow: 0 0 18px rgba(212, 154, 73, 0.4);
+    color: #f6e7c1 !important;
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 18px rgba(212, 154, 73, 0.5);
 }
 
 .intro-subtitle {
-    font-size: 1rem;
-    color: #b5a48b !important;
-    margin-bottom: 35px;
+    font-size: 0.95rem;
+    color: #c5b092 !important;
+    letter-spacing: 1.5px;
+    font-style: italic;
+}
+
+/* 본문 컨텐츠 영역 */
+.intro-content {
+    padding: 15px 38px 40px 38px;
+    text-align: center;
+}
+
+/* 에피그래프(소설 서문 인용구) */
+.epigraph-box {
+    margin: 10px auto 30px auto;
+    padding: 14px 20px;
+    max-width: 88%;
+    border-top: 1px solid rgba(200, 150, 75, 0.25);
+    border-bottom: 1px solid rgba(200, 150, 75, 0.25);
+    color: #b8a68e !important;
+    font-size: 0.95rem;
+    line-height: 1.85;
     font-style: italic;
 }
 
 .intro-body {
-    font-size: 1.05rem;
-    color: #dcd3c6 !important;
-    text-align: center;
-    margin-bottom: 35px;
+    font-size: 1.02rem;
+    color: #ddd4c7 !important;
+    line-height: 2.05;
+    margin-bottom: 32px;
     word-break: keep-all;
 }
 
+/* 3단 비주얼 무드 카드 */
+.mood-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 32px;
+}
+
+@media (max-width: 640px) {
+    .mood-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mood-card {
+    background: #191410;
+    border: 1px solid #33281b;
+    border-radius: 6px;
+    overflow: hidden;
+    text-align: left;
+    transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.mood-card:hover {
+    transform: translateY(-3px);
+    border-color: #9e7336;
+}
+
+.mood-img {
+    width: 100%;
+    height: 115px;
+    object-fit: cover;
+    filter: sepia(28%) contrast(105%) brightness(78%);
+    border-bottom: 1px solid #2e2418;
+}
+
+.mood-text-wrap {
+    padding: 12px 14px;
+}
+
+.mood-step {
+    font-size: 0.75rem;
+    color: #c8964b !important;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+}
+
+.mood-heading {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #efe5d5 !important;
+    margin-bottom: 5px;
+}
+
+.mood-desc {
+    font-size: 0.82rem;
+    color: #a89984 !important;
+    line-height: 1.55;
+    word-break: keep-all;
+}
+
+/* 하단 안내 박스 */
 .intro-guide {
-    background-color: rgba(200, 150, 75, 0.07);
+    background-color: rgba(200, 150, 75, 0.06);
+    border: 1px solid rgba(200, 150, 75, 0.2);
     border-left: 3px solid #c8964b;
     padding: 16px 22px;
     text-align: left;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     color: #cbbba6 !important;
     border-radius: 4px;
-    line-height: 1.75;
+    line-height: 1.8;
 }
 
 /* 입력창 다크 브라운 & 금빛 테두리 스타일링 */
 input, textarea, [data-baseweb="select"] > div {
-    background-color: #1a1612 !important;
+    background-color: #181410 !important;
     color: #f0e9df !important;
     border: 1px solid #3a3025 !important;
     font-family: 'MaruBuri', serif !important;
@@ -94,17 +211,18 @@ input:focus, textarea:focus {
 
 /* 버튼 스타일: 등불 빛깔의 앤티크 골드 */
 button[kind="primary"] {
-    background: linear-gradient(135deg, #b8863e 0%, #8f6224 100%) !important;
+    background: linear-gradient(135deg, #b8863e 0%, #82571d 100%) !important;
     color: #fffaf0 !important;
     border: 1px solid #d4a75d !important;
     font-weight: 600 !important;
-    box-shadow: 0 4px 15px rgba(184, 134, 62, 0.25) !important;
+    padding: 0.65rem 1.2rem !important;
+    box-shadow: 0 4px 18px rgba(184, 134, 62, 0.3) !important;
     transition: all 0.25s ease !important;
 }
 
 button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #cc984a 0%, #a3722c 100%) !important;
-    box-shadow: 0 4px 22px rgba(212, 167, 93, 0.45) !important;
+    background: linear-gradient(135deg, #cc984a 0%, #9c6b27 100%) !important;
+    box-shadow: 0 6px 24px rgba(212, 167, 93, 0.5) !important;
 }
 
 button[kind="secondary"] {
@@ -168,7 +286,7 @@ for k, default_val in DEFAULT_KEYS.items():
         st.session_state[k] = st.session_state[k]
 
 if "entered" not in st.session_state:
-    st.session_state.entered = False  # False면 입장 페이지, True면 설문 페이지
+    st.session_state.entered = False
 if "current_step" not in st.session_state:
     st.session_state.current_step = 0
 if "scroll_to_top" not in st.session_state:
@@ -180,7 +298,6 @@ if "novel_result" not in st.session_state:
 if "design_note" not in st.session_state:
     st.session_state.design_note = None
 
-# 화면 상단 자동 스크롤
 if st.session_state.scroll_to_top:
     components.html(
         "<script>window.parent.document.querySelector('section.main').scrollTo({top: 0, behavior: 'smooth'});</script>",
@@ -202,29 +319,64 @@ def reset_all():
     st.session_state.scroll_to_top = True
 
 # ─────────────────────────────────────────────────────────
-# [화면 A] 입장 페이지 (사이트 소개 및 분위기 연출)
+# [화면 A] 시네마틱 입장 페이지 (이미지 + 분위기 연출)
 # ─────────────────────────────────────────────────────────
 if not st.session_state.entered:
-    st.markdown("""
-    <div class="intro-card">
-        <div style="font-size: 2.5rem; margin-bottom: 10px;">🕯️</div>
-        <div class="intro-title">나의 가능세계</div>
-        <div class="intro-subtitle">The Archive of Unchosen Paths</div>
-        <div class="intro-body">
-            우리는 매일 수많은 갈림길을 지나며 살아갑니다.<br>
-            하나의 문을 열면 다른 문들은 조용히 닫히지만,<br>
-            닫힌 문 너머의 시간 역시 어딘가에서 계속 흐르고 있을지 모릅니다.<br><br>
-            이곳은 당신의 기억과 성향, 간직한 사물, 그리고 미처 선택하지 못한 열망을 단서 삼아<br>
-            <b>지금의 내가 걸어갈 미래</b>와 <b>다른 선택을 했다면 존재했을 나</b>의 조우를 기록하는 서재입니다.
-        </div>
-        <div class="intro-guide">
-            <b>📖 기록을 시작하기 전에</b><br>
-            • 총 6개 파트(23개 문항)로 구성되어 있으며, 작성에는 <b>약 5~7분</b>이 소요됩니다.<br>
-            • 주관식 문항에 추상적인 단어보다 <b>구체적인 장면, 소리, 냄새, 사물의 디테일</b>을 적어주실수록 당신만의 고유한 단편소설이 완성됩니다.<br>
-            • 작성된 내용은 소설 생성 즉시 휘발되며 별도로 저장되지 않습니다.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    intro_html = """
+<div class="intro-wrapper">
+<div class="hero-banner">
+<div class="lantern-icon">🕯️</div>
+<div class="intro-title">나의 가능세계</div>
+<div class="intro-subtitle">The Archive of Unchosen Paths</div>
+</div>
+<div class="intro-content">
+<div class="epigraph-box">
+“가보지 못한 길은 사라지지 않는다.<br>
+다만 우리가 뒤돌아보지 않는 시간 속에서 조용히 자라날 뿐이다.”
+</div>
+<div class="intro-body">
+우리는 매일 수많은 갈림길을 지나며 살아갑니다.<br>
+하나의 문을 열면 다른 문들은 소리 없이 닫히지만,<br>
+닫힌 문 너머의 시간 역시 어딘가에서 계속 흐르고 있을지 모릅니다.<br><br>
+이 서재는 당신의 성향과 오래된 기억, 그리고 미처 선택하지 못한 열망을 단서 삼아<br>
+<b>지금의 내가 걸어갈 미래</b>와 <b>다른 선택을 했다면 존재했을 나</b>를 한 편의 단편소설로 엮어냅니다.
+</div>
+<div class="mood-grid">
+<div class="mood-card">
+<img class="mood-img" src="https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?auto=format&fit=crop&w=600&q=80" alt="Object">
+<div class="mood-text-wrap">
+<div class="mood-step">ARCHIVE I</div>
+<div class="mood-heading">기억의 사물과 흔적</div>
+<div class="mood-desc">당신이 오래 간직한 물건과 버릇이 두 세계를 잇는 매개가 됩니다.</div>
+</div>
+</div>
+<div class="mood-card">
+<img class="mood-img" src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=600&q=80" alt="Present">
+<div class="mood-text-wrap">
+<div class="mood-step">ARCHIVE II</div>
+<div class="mood-heading">지금의 궤적과 다른 길</div>
+<div class="mood-desc">현재의 치열한 일상과, 모든 제약을 벗어난 또 다른 가능성을 나란히 비춥니다.</div>
+</div>
+</div>
+<div class="mood-card">
+<img class="mood-img" src="https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80" alt="Encounter">
+<div class="mood-text-wrap">
+<div class="mood-step">ARCHIVE III</div>
+<div class="mood-heading">경계에서의 조우</div>
+<div class="mood-desc">두 시간선이 스치듯 교차하며 서로에게 묻어두었던 질문을 건넵니다.</div>
+</div>
+</div>
+</div>
+<div class="intro-guide">
+<b>📖 기록을 시작하기 전에</b><br>
+• 총 6개 파트(23개 문항)로 구성되어 있으며, 작성에는 <b>약 5~7분</b>이 소요됩니다.<br>
+• 주관식 문항에 추상적인 표현 대신 <b>구체적인 장면, 소리, 냄새, 사물의 촉감</b>을 적어주실수록 밀도 높은 소설이 완성됩니다.<br>
+• 입력하신 모든 기록은 소설 집필 즉시 휘발되며 서버에 저장되지 않습니다.
+</div>
+</div>
+</div>
+"""
+    st.markdown(intro_html, unsafe_allow_html=True)
 
     if st.button("🕯️ 등불을 켜고 서재로 들어서기", type="primary", use_container_width=True):
         st.session_state.entered = True
@@ -245,7 +397,7 @@ else:
             st.session_state.scroll_to_top = True
             st.rerun()
 
-    # BGM 플레이어 슬롯 (추후 원하는 MP3 URL이나 파일 경로로 변경 가능)
+    # BGM 플레이어 슬롯
     with st.expander("🎧 서재 배경음악 (BGM) 열기"):
         st.audio(
             "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3",
