@@ -10,10 +10,15 @@ from prompts import SYSTEM_PROMPT
 # 1. 페이지 기본 설정
 st.set_page_config(page_title="나의 가능세계", page_icon="📖", layout="centered")
 
-# 2. 어두운 등불 & 시네마틱 고서 테마 CSS + 좌측 상단 소설책 픽토그램 스타일
+# 2. 어두운 등불 & 시네마틱 고서 테마 CSS + 좌측 상단 단독 픽토그램 스타일
 st.markdown("""
 <style>
 @import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
+
+/* Streamlit 기본 상단 헤더 배경 투명화 (픽토그램 잘림 방지) */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
 
 /* 등불 일렁임 애니메이션 */
 @keyframes candleFlicker {
@@ -23,7 +28,7 @@ st.markdown("""
 
 @keyframes floatSlow {
     0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-4px); }
+    50% { transform: translateY(4px); }
 }
 
 @keyframes fadeInSlow {
@@ -47,21 +52,21 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
     color: #e6dfd5 !important;
 }
 
-/* 화면 왼쪽 위 고정 소설책 픽토그램 엠블럼 */
+/* 화면 왼쪽 위 고정 소설책 단독 픽토그램 (잘림 방지 및 텍스트 제거) */
 .top-left-book-emblem {
     position: fixed;
-    top: 58px;
-    left: 28px;
-    z-index: 999;
+    top: 72px;
+    left: 32px;
+    z-index: 999999;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    background: linear-gradient(135deg, rgba(26, 21, 16, 0.92) 0%, rgba(15, 12, 9, 0.85) 100%);
-    border: 1px solid rgba(200, 150, 75, 0.38);
-    border-left: 3px solid #c8964b;
-    border-radius: 6px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.75), 0 0 18px rgba(200, 150, 75, 0.12);
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    background: linear-gradient(135deg, rgba(26, 21, 16, 0.92) 0%, rgba(15, 12, 9, 0.88) 100%);
+    border: 1px solid rgba(200, 150, 75, 0.45);
+    border-radius: 10px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8), 0 0 18px rgba(200, 150, 75, 0.15);
     pointer-events: none;
     animation: floatSlow 5s infinite ease-in-out;
 }
@@ -69,37 +74,18 @@ h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTe
 .top-left-book-emblem svg {
     width: 34px;
     height: 34px;
-    filter: drop-shadow(0 0 8px rgba(212, 154, 73, 0.45));
+    overflow: visible;
+    filter: drop-shadow(0 0 8px rgba(212, 154, 73, 0.5));
 }
 
-.emblem-text-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.emblem-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #f3e2b3 !important;
-    letter-spacing: 1.5px;
-    line-height: 1.2;
-}
-
-.emblem-sub {
-    font-size: 0.68rem;
-    color: #a89478 !important;
-    letter-spacing: 0.8px;
-    margin-top: 2px;
-}
-
-/* 모바일 등 좁은 화면에서는 상단 인라인 배지로 전환 */
+/* 모바일 등 좁은 화면에서는 상단 인라인 아이콘으로 전환 */
 @media (max-width: 1100px) {
     .top-left-book-emblem {
         position: relative;
         top: 0;
         left: 0;
+        margin-top: 8px;
         margin-bottom: 14px;
-        width: fit-content;
     }
 }
 
@@ -321,10 +307,10 @@ button[kind="secondary"]:hover {
 }
 </style>
 
-<!-- 화면 왼쪽 위 고정 소설책 픽토그램 -->
+<!-- 화면 왼쪽 위 고정 소설책 단독 픽토그램 -->
 <div class="top-left-book-emblem">
     <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#e2b86b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="rgba(200, 150, 75, 0.12)"/>
+        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#e2b86b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="rgba(200, 150, 75, 0.14)"/>
         <path d="M32 16V52" stroke="#e2b86b" stroke-width="2.2" stroke-linecap="round"/>
         <path d="M12 22C17 20.5 23 21 27 23.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
         <path d="M12 30C17 28.5 23 29 27 31.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
@@ -335,17 +321,13 @@ button[kind="secondary"]:hover {
         <circle cx="32" cy="8" r="2.2" fill="#f6e7c1"/>
         <path d="M32 3V5M26 7L28 8M38 7L36 8" stroke="#f6e7c1" stroke-width="1.4" stroke-linecap="round"/>
     </svg>
-    <div class="emblem-text-group">
-        <span class="emblem-title">가능세계 서재</span>
-        <span class="emblem-sub">NOVEL ARCHIVE</span>
-    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # 3. 제미나이 클라이언트 연결
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 4. 세션 상태 초기화 (p0_q4_custom 추가)
+# 4. 세션 상태 초기화 (p0_q4_custom 포함)
 DEFAULT_KEYS = {
     "p0_q1": "", "p0_q2": 25, "p0_q3": None, "p0_q4_type": None,
     "p0_q4_custom": "", "p0_q4_detail": "", "p0_q5": "", "p0_q6": "", "p0_q7": "",
@@ -397,10 +379,8 @@ def is_sincere_text(val, min_len=2):
     cleaned = val.strip()
     if len(cleaned) < min_len:
         return False
-    # 자음/모음만 반복되거나(ㅋㅋㅋ, ㅇㅇ 등) 특수문자/숫자만 있는 경우 불성실로 판별
     if re.fullmatch(r"[ㄱ-ㅎㅏ-ㅣ\W_]+", cleaned):
         return False
-    # 똑같은 글자만 2번 이상 반복된 경우 (예: '아아', '111')
     if len(set(cleaned.replace(" ", ""))) == 1 and len(cleaned) >= 2:
         return False
     return True
@@ -415,10 +395,9 @@ def check_part0_other_job_valid():
 
 
 def evaluate_survey_sincerity():
-    """전체 핵심 문항(22개, 기본값 고정인 나이 제외)의 성실 응답률 및 부족한 파트 계산"""
+    """전체 핵심 문항의 성실 응답률 및 부족한 파트 계산"""
     s = st.session_state
 
-    # 4번 문항('기타' 선택 시 직접 입력값까지 있어야 인정)
     q4_valid = (
         is_sincere_text(s.p0_q4_custom, min_len=1)
         if s.p0_q4_type == "기타"
@@ -486,7 +465,6 @@ def evaluate_survey_sincerity():
 
 
 def go_to_step(step_idx):
-    # PART 0에서 다른 파트로 이동하려 할 때 '기타' 미입력 시 이동 차단
     if st.session_state.current_step == 0 and step_idx > 0:
         if not check_part0_other_job_valid():
             st.session_state.step_warning = "⚠️ '4. 현재 하고 있는 일'에서 '기타'를 선택하셨습니다. 아래 칸에 현재 하고 있는 일을 직접 입력하셔야 다음 단계로 넘어갈 수 있습니다."
@@ -614,7 +592,6 @@ else:
     st.progress((st.session_state.current_step + 1) / len(PART_TITLES))
     st.markdown("---")
 
-    # 단계 이동 경고 메시지 출력
     if st.session_state.step_warning:
         st.warning(st.session_state.step_warning)
 
@@ -629,7 +606,6 @@ else:
         with col2:
             st.selectbox("3. 성별", ["남성", "여성", "기타", "답하고 싶지 않음"], index=None, placeholder="선택해주세요", key="p0_q3")
 
-        # 4. 현재 하고 있는 일 ('기타' 선택 시 조건부 직접 입력창 노출)
         st.selectbox(
             "4. 현재 하고 있는 일",
             ["대학생", "직장인", "취업 준비 중", "프리랜서", "자영업", "기타"],
@@ -751,14 +727,12 @@ else:
                 st.rerun()
         else:
             if st.button("🕯️ 나의 가능세계 기록 펼치기", type="primary", use_container_width=True):
-                # 1차 검사: PART 0 '기타' 선택 후 미입력 여부 확인
                 if not check_part0_other_job_valid():
                     st.warning(
                         "⚠️ **PART 0의 '4. 현재 하고 있는 일'**에서 **'기타'**를 선택하셨으나 내용을 입력하지 않으셨습니다. "
                         "PART 0으로 돌아가 현재 하고 있는 일을 직접 입력해 주세요."
                     )
                 else:
-                    # 2차 검사: 50% 이상 성실 응답 여부 확인
                     ratio, filled_cnt, total_cnt, weak_parts = evaluate_survey_sincerity()
                     if ratio < 0.5:
                         weak_str = ", ".join(weak_parts) if weak_parts else "전체 파트"
@@ -775,7 +749,6 @@ else:
         st.session_state.generate_trigger = False
         s = st.session_state
 
-        # '기타'를 선택한 경우 사용자가 직접 입력한 직업을 최종 데이터로 저장 및 반영
         final_job_type = (
             s.p0_q4_custom.strip()
             if s.p0_q4_type == "기타"
