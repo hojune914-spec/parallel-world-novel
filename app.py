@@ -8,7 +8,7 @@ from google.genai import types
 from prompts import SYSTEM_PROMPT
 
 # 1. 페이지 기본 설정
-st.set_page_config(page_title="나의 가능세계", page_icon="📖", layout="centered")
+st.set_page_config(page_title="나의 가능세계 | 가능세계 서재 - AI 평행우주 단편소설", page_icon="📖", layout="centered")
 
 # 2. 어두운 등불 & 시네마틱 고서 테마 CSS + 좌측 상단 단독 픽토그램 스타일
 st.markdown("""
