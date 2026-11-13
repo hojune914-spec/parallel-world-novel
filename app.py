@@ -1,11 +1,13 @@
 # app.py
 import base64
+import io
 import re
 import time
 import urllib.parse
 import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 from google import genai
 from google.genai import types
 from prompts import SYSTEM_PROMPT
@@ -17,7 +19,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# 2. 숭고한(Sublime) 다크 아카이브 & 맞춤형 크로키 북커버 CSS
+# 2. 숭고한(Sublime) 다크 아카이브 & 몽환적 픽토그램 & 북커버 CSS
 st.markdown("""
 <style>
 @import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
@@ -27,8 +29,18 @@ header[data-testid="stHeader"] {
 }
 
 @keyframes slowPulse {
-    0%, 100% { opacity: 0.75; }
+    0%, 100% { opacity: 0.72; }
     50% { opacity: 1; }
+}
+
+@keyframes dreamyFloat {
+    0%, 100% { transform: translateY(0px) rotate(0deg); filter: drop-shadow(0 0 12px rgba(212, 175, 115, 0.28)); }
+    50% { transform: translateY(-6px) rotate(1deg); filter: drop-shadow(0 0 22px rgba(230, 195, 135, 0.55)); }
+}
+
+@keyframes starTwinkle {
+    0%, 100% { opacity: 0.25; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1.15); }
 }
 
 @keyframes fadeInUp {
@@ -40,7 +52,7 @@ header[data-testid="stHeader"] {
 .stApp {
     background-color: #070605;
     background-image: 
-        radial-gradient(ellipse 38% 55% at 50% 0%, rgba(212, 175, 115, 0.14) 0%, rgba(18, 14, 10, 0.45) 55%, rgba(7, 6, 5, 1) 100%);
+        radial-gradient(ellipse 42% 55% at 50% 0%, rgba(212, 175, 115, 0.14) 0%, rgba(18, 14, 10, 0.45) 55%, rgba(7, 6, 5, 1) 100%);
     color: #e6dfd5;
     font-family: 'MaruBuri', serif;
 }
@@ -59,42 +71,52 @@ div[data-testid="stHorizontalBlock"] button {
     min-height: 38px !important;
 }
 
-/* 좌측 상단 미니멀 고서 엠블럼 */
-.top-left-book-emblem {
+/* ─────────────────────────────────────────────────────────
+   좌측 상단 몽환적인 고서 & 평행우주 천체 궤도 픽토그램
+   ───────────────────────────────────────────────────────── */
+.dreamy-book-emblem {
     position: fixed;
-    top: 68px;
-    left: 32px;
+    top: 54px;
+    left: max(28px, calc(50vw - 540px));
     z-index: 999999;
+    width: 92px;
+    height: 92px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
-    background: rgba(14, 12, 10, 0.85);
-    border: 1px solid rgba(198, 163, 106, 0.35);
-    border-radius: 50%;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
     pointer-events: none;
+    animation: dreamyFloat 6s infinite ease-in-out;
 }
 
-.top-left-book-emblem svg {
-    width: 24px;
-    height: 24px;
+.dreamy-book-emblem svg {
+    width: 100%;
+    height: 100%;
     overflow: visible;
 }
 
-@media (max-width: 1100px) {
-    .top-left-book-emblem {
+.dreamy-book-emblem .twinkle-1 {
+    animation: starTwinkle 3.2s infinite ease-in-out;
+    transform-origin: center;
+}
+
+.dreamy-book-emblem .twinkle-2 {
+    animation: starTwinkle 4.5s infinite ease-in-out 1.2s;
+    transform-origin: center;
+}
+
+@media (max-width: 1120px) {
+    .dreamy-book-emblem {
         position: relative;
         top: 0;
         left: 0;
-        margin-top: 6px;
-        margin-bottom: 12px;
+        width: 72px;
+        height: 72px;
+        margin: 4px auto 8px auto;
     }
 }
 
 /* ─────────────────────────────────────────────────────────
-   입장 페이지: 숭고한(Sublime) 모놀리스 & 건축적 여백 디자인
+   입장 페이지: 숭고한(Sublime) 건축적 여백 & 정돈된 줄바꿈
    ───────────────────────────────────────────────────────── */
 .sublime-wrapper {
     position: relative;
@@ -112,11 +134,10 @@ div[data-testid="stHorizontalBlock"] button {
     padding: 0 0 48px 0;
 }
 
-/* 상단 건축적 아치 & 빛의 회랑 비주얼 */
 .sublime-hero {
     position: relative;
     width: 100%;
-    height: 360px;
+    height: 350px;
     background-image:
         linear-gradient(to bottom, rgba(7, 6, 5, 0.35) 0%, rgba(11, 9, 8, 0.72) 70%, #0b0908 100%),
         url('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=85');
@@ -131,7 +152,6 @@ div[data-testid="stHorizontalBlock"] button {
     padding: 0 24px;
 }
 
-/* 두 궤적의 교차를 상징하는 기하학 아스트롤라베 선화 */
 .sacred-geometry {
     margin-bottom: 22px;
     animation: slowPulse 5s infinite ease-in-out;
@@ -162,40 +182,43 @@ div[data-testid="stHorizontalBlock"] button {
 }
 
 .sublime-body-section {
-    padding: 10px 46px 0 46px;
+    padding: 10px 36px 0 36px;
     text-align: center;
-}
-
-@media (max-width: 640px) {
-    .sublime-body-section {
-        padding: 10px 22px 0 22px;
-    }
-    .sublime-title {
-        font-size: 1.9rem;
-        letter-spacing: 4px;
-    }
 }
 
 .sublime-epigraph {
     font-size: 1.02rem;
     color: #d6c8b4 !important;
-    line-height: 2.1;
-    letter-spacing: 0.4px;
-    margin: 0 auto 36px auto;
-    max-width: 520px;
+    line-height: 2.15;
+    letter-spacing: 0.3px;
+    margin: 0 auto 34px auto;
+    max-width: 640px;
     font-weight: 300;
+    word-break: keep-all;
 }
 
 .sublime-prose {
     font-size: 0.96rem;
     color: #aba090 !important;
-    line-height: 2.15;
-    max-width: 540px;
-    margin: 0 auto 44px auto;
+    line-height: 2.2;
+    max-width: 640px;
+    margin: 0 auto 42px auto;
     word-break: keep-all;
 }
 
-/* 3단 아카이브 필러 (과장 없이 절제된 타이포그래피 그리드) */
+@media (max-width: 640px) {
+    .sublime-body-section {
+        padding: 10px 20px 0 20px;
+    }
+    .sublime-title {
+        font-size: 1.9rem;
+        letter-spacing: 4px;
+    }
+    .sublime-prose br.desktop-br {
+        display: none;
+    }
+}
+
 .pillar-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -240,7 +263,7 @@ div[data-testid="stHorizontalBlock"] button {
 }
 
 .sublime-notice {
-    max-width: 540px;
+    max-width: 600px;
     margin: 0 auto;
     padding: 18px 24px;
     background: rgba(255, 255, 255, 0.015);
@@ -248,14 +271,15 @@ div[data-testid="stHorizontalBlock"] button {
     text-align: left;
     font-size: 0.85rem;
     color: #9e9283 !important;
-    line-height: 1.85;
+    line-height: 1.9;
+    word-break: keep-all;
 }
 
 /* ─────────────────────────────────────────────────────────
-   맞춤형 흑백 연필 크로키 단행본 표지 (Custom Book Cover)
+   서프라이즈 흑백 연필 크로키 단행본 표지 (워터마크 완전 차단)
    ───────────────────────────────────────────────────────── */
 .book-cover-outer {
-    max-width: 440px;
+    max-width: 430px;
     margin: 28px auto 38px auto;
     background-color: #efebe1;
     background-image: 
@@ -300,7 +324,7 @@ div[data-testid="stHorizontalBlock"] button {
 
 .croquis-frame {
     width: 100%;
-    aspect-ratio: 3 / 3.6;
+    aspect-ratio: 3 / 3.4;
     background-color: #efeae0;
     border: 1px solid #b8ad9b;
     overflow: hidden;
@@ -312,12 +336,13 @@ div[data-testid="stHorizontalBlock"] button {
 }
 
 .croquis-frame img {
-    width: 100%;
-    height: 100%;
+    width: 108%;
+    height: 116%;
     object-fit: cover;
-    /* 어떤 이미지든 종이 위에 그린 흑백 연필/목탄 크로키 질감으로 변환 */
-    filter: grayscale(100%) contrast(135%) brightness(103%);
+    object-position: center 15%;
+    filter: grayscale(100%) contrast(138%) brightness(104%);
     mix-blend-mode: multiply;
+    display: block;
 }
 
 .book-cover-footer {
@@ -397,11 +422,43 @@ button[kind="secondary"]:hover {
 }
 </style>
 
-<!-- 좌측 상단 미니멀 고서 픽토그램 -->
-<div class="top-left-book-emblem">
-    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#c8a46e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M32 16V52" stroke="#c8a46e" stroke-width="2" stroke-linecap="round"/>
+<!-- 좌측 상단 몽환적인 고서 & 천체 궤도 픽토그램 -->
+<div class="dreamy-book-emblem">
+    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- 배경 은은한 후광 링 -->
+        <circle cx="60" cy="60" r="46" stroke="#c8a46e" stroke-width="0.6" stroke-opacity="0.3" stroke-dasharray="2 4"/>
+        <!-- 교차하는 두 평행우주 타원 궤도 -->
+        <ellipse cx="60" cy="56" rx="48" ry="18" transform="rotate(-24 60 56)" stroke="#d8b884" stroke-width="0.9" stroke-opacity="0.55"/>
+        <ellipse cx="60" cy="56" rx="48" ry="18" transform="rotate(24 60 56)" stroke="#d8b884" stroke-width="0.9" stroke-opacity="0.55"/>
+        <!-- 상단 북극성(인과의 별) 광채 -->
+        <g class="twinkle-1">
+            <path d="M60 14 L62.2 23.8 L72 26 L62.2 28.2 L60 38 L57.8 28.2 L48 26 L57.8 23.8 Z" fill="#f6e7c1" fill-opacity="0.9"/>
+            <circle cx="60" cy="26" r="2" fill="#ffffff"/>
+        </g>
+        <!-- 주변 몽환적 별빛 입자들 -->
+        <g class="twinkle-2">
+            <circle cx="28" cy="34" r="1.5" fill="#f4ece0"/>
+            <circle cx="92" cy="38" r="1.3" fill="#f4ece0"/>
+            <circle cx="42" cy="18" r="1" fill="#c8a46e"/>
+            <circle cx="82" cy="78" r="1.4" fill="#e3c998"/>
+            <path d="M90 22 L91 25 L94 26 L91 27 L90 30 L89 27 L86 26 L89 25 Z" fill="#e3c998" fill-opacity="0.8"/>
+        </g>
+        <!-- 펼쳐진 고서(Open Book) 본체 -->
+        <path d="M60 54 C49 46, 33 45, 22 49 V81 C33 77, 49 78, 60 86 C71 78, 87 77, 98 81 V49 C87 45, 71 46, 60 54 Z" 
+              fill="rgba(22, 18, 14, 0.85)" stroke="#e2c088" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- 책장 겹침 레이어 -->
+        <path d="M25 84 C35 80, 49 81, 60 89 C71 81, 85 80, 95 84" stroke="#b8945c" stroke-width="1.1" stroke-linecap="round"/>
+        <!-- 책 중앙 제본선 및 수직 빛줄기 -->
+        <line x1="60" y1="38" x2="60" y2="86" stroke="#f4ece0" stroke-width="1.2" stroke-opacity="0.75"/>
+        <!-- 페이지 내부 문장 흔적 -->
+        <path d="M31 58 C38 56, 46 57, 52 60" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <path d="M31 65 C38 63, 46 64, 52 67" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <path d="M31 72 C38 70, 46 71, 52 74" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <path d="M89 58 C82 56, 74 57, 68 60" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <path d="M89 65 C82 63, 74 64, 68 67" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <path d="M89 72 C82 70, 74 71, 68 74" stroke="#c8a46e" stroke-width="1" stroke-opacity="0.65" stroke-linecap="round"/>
+        <!-- 하단 초승달 아치 장식 -->
+        <path d="M44 95 C52 100, 68 100, 76 95 C67 103, 53 103, 44 95 Z" fill="#c8a46e" fill-opacity="0.65"/>
     </svg>
 </div>
 """, unsafe_allow_html=True)
@@ -456,40 +513,86 @@ if st.session_state.scroll_to_top:
 
 
 # ─────────────────────────────────────────────────────────
-# 맞춤형 흑백 연필 크로키 표지 실시간 생성 함수
+# 워터마크 제거용 이미지 하단 크롭 헬퍼 함수
+# ─────────────────────────────────────────────────────────
+def crop_watermark_bytes(img_bytes):
+    """이미지 하단 12%(워터마크가 위치하는 영역)를 물리적으로 잘라내어 깨끗한 바이트로 반환"""
+    try:
+        with Image.open(io.BytesIO(img_bytes)) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+            # 상단 2% ~ 하단 88% 영역만 남기고 크롭 (하단 모서리 워터마크 원천 제거)
+            cropped = im.crop((int(w * 0.02), int(h * 0.02), int(w * 0.98), int(h * 0.88)))
+            out = io.BytesIO()
+            cropped.save(out, format="JPEG", quality=92)
+            return out.getvalue()
+    except Exception:
+        return img_bytes
+
+
+# ─────────────────────────────────────────────────────────
+# 소설 맞춤형 고임팩트 흑백 연필 크로키 표지 생성 함수
 # ─────────────────────────────────────────────────────────
 def generate_custom_croquis_cover(s):
-    """사용자의 핵심 오브제(p2_q13)와 서사 분위기를 추출해 맞춤형 흑백 연필 크로키 표지를 생성"""
-    raw_obj = s.p2_q13.strip() if s.p2_q13 and s.p2_q13.strip() else "오래된 회중시계와 열쇠"
-    raw_mood = s.p4_q18.strip() if s.p4_q18 and s.p4_q18.strip() else "안개 낀 밤의 갈림길"
+    """설문 전체 맥락과 핵심 오브제를 결합해 가장 임팩트 있는 상징적 흑백 크로키 표지를 생성"""
+    raw_obj = s.p2_q13.strip() if s.p2_q13 and s.p2_q13.strip() else "오래된 은반지와 열쇠"
+    raw_turning = s.p2_q11.strip() if s.p2_q11 and s.p2_q11.strip() else ""
+    raw_alt_life = s.p4_q18.strip() if s.p4_q18 and s.p4_q18.strip() else ""
+    raw_free = s.p4_q19.strip() if s.p4_q19 and s.p4_q19.strip() else ""
     author_name = s.p0_q1.strip() if s.p0_q1 and s.p0_q1.strip() else "무명(無名)"
 
-    # 1. 제미나이로 사용자의 오브제를 영문 크로키 드로잉 지시문과 짧은 부제로 변환
-    subject_en = "a vintage object resting on an old wooden desk by a quiet window"
-    book_subtitle = f"{raw_obj[:18]}에 스민 두 개의 시간"
+    subject_en = None
+    book_subtitle = f"{raw_obj[:16]}에 스민 두 개의 시간"
+
+    # 1. 제미나이로 사용자의 오브제 + 다른 삶의 풍경을 결합한 강렬한 크로키 구도 추출
     try:
+        prompt_for_visual = (
+            f"다음은 평행우주 단편소설의 핵심 소재입니다.\n"
+            f"- 핵심 오브제(가장 중요): {raw_obj}\n"
+            f"- 과거의 변곡점: {raw_turning}\n"
+            f"- 선택하지 않은 다른 삶: {raw_alt_life} / {raw_free}\n\n"
+            f"이 소설의 단행본 표지에 들어갈 '가장 임팩트 있고 시적인 흑백 연필 크로키 장면'을 설계해주세요.\n"
+            f"조건:\n"
+            f"1. 반드시 '핵심 오브제({raw_obj})'가 화면 중앙 클로즈업 피사체로 명확히 등장해야 하며, 그 배경이나 그림자 속에 '선택하지 않은 다른 삶의 분위기'가 초현실적이거나 서정적으로 겹쳐 보여야 합니다. (절대 무관한 책상이나 방을 그리지 마세요.)\n"
+            f"2. 아래 두 줄 형식을 정확히 지켜 출력하세요 (마크다운 기호 없이):\n"
+            f"SCENE_EN: [25단어 이내의 구체적인 영문 시각 묘사. 글자/텍스트 제외]\n"
+            f"SUBTITLE_KO: [표지에 인쇄할 문학적이고 절제된 한국어 부제, 15자 이내]"
+        )
         meta_res = client.models.generate_content(
             model="gemini-3.8-flash",
-            contents=(
-                f"사용자의 기억 속 물건은 '{raw_obj}', 다른 삶의 풍경은 '{raw_mood}'입니다.\n"
-                f"1줄째에는 이 물건을 중심으로 한 정물/배경 흑백 연필 크로키용 영문 묘사(20단어 이내, 글자/텍스트 절대 제외)를 적고,\n"
-                f"2줄째에는 단행본 표지에 들어갈 품격 있고 절제된 한국어 부제(15자 이내)를 적어주세요.\n"
-                f"형식:\nEN: ...\nKO: ..."
-            ),
+            contents=prompt_for_visual,
         )
-        for line in meta_res.text.strip().splitlines():
-            if line.startswith("EN:"):
-                subject_en = line.replace("EN:", "").strip()
-            elif line.startswith("KO:"):
-                book_subtitle = line.replace("KO:", "").strip()
+        res_text = meta_res.text.strip()
+
+        en_match = re.search(r"SCENE_EN\s*[:\-]\s*(.+)", res_text, re.IGNORECASE)
+        ko_match = re.search(r"SUBTITLE_KO\s*[:\-]\s*(.+)", res_text, re.IGNORECASE)
+
+        if en_match:
+            subject_en = re.sub(r"[*`\"']", "", en_match.group(1)).strip()
+        if ko_match:
+            book_subtitle = re.sub(r"[*`\"']", "", ko_match.group(1)).strip()
+
+        # 만약 태그 없이 영문 문장만 반환했을 경우에도 놓치지 않고 추출
+        if not subject_en:
+            lines = [ln.strip() for ln in res_text.splitlines() if ln.strip()]
+            if lines:
+                subject_en = re.sub(r"[*`\"']", "", lines[0]).strip()
     except Exception:
         pass
 
+    # 만일 API 호출이 일시 실패하더라도 사용자가 입력한 오브제가 직접 반영되도록 처리
+    if not subject_en:
+        subject_en = (
+            f" dramatic artistic close-up of ({raw_obj}), resting on an open human palm "
+            f"with two diverging shadow paths in the background"
+        )
+
     croquis_prompt = (
-        f"Minimalist black and white rough pencil croquis sketch on aged cream paper, "
-        f"expressive graphite line drawing, fine hatching, contours and raw pencil strokes, "
-        f"literary novel illustration, centered single subject with generous blank paper space, "
-        f"strictly no text, no letters, no words, no signature. Subject: {subject_en}"
+        f"Masterpiece rough charcoal and graphite pencil croquis drawing on vintage cream sketch paper, "
+        f"centered composition in the upper-middle frame with generous blank paper margin at the bottom, "
+        f"dramatic close-up focal point on: {subject_en}. "
+        f"Expressive hand-drawn pencil strokes, cross-hatching, high contrast black and white sketch, "
+        f"poetic and symbolic literary book illustration, strictly no text, no letters, no watermark, no signature."
     )
 
     img_b64 = None
@@ -506,41 +609,42 @@ def generate_custom_croquis_cover(s):
             ),
         )
         if img_res.generated_images:
-            img_bytes = img_res.generated_images[0].image.image_bytes
-            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            raw_bytes = img_res.generated_images[0].image.image_bytes
+            clean_bytes = crop_watermark_bytes(raw_bytes)
+            img_b64 = base64.b64encode(clean_bytes).decode("utf-8")
     except Exception:
         pass
 
-    # 3. 2차 자동 폴백: Imagen 모델 권한 제한 시 즉시 크로키 스케치 엔진으로 생성
+    # 3. 2차 폴백: 스케치 생성 후 하단 워터마크 영역 물리적 크롭
     if not img_b64:
         try:
             encoded = urllib.parse.quote(croquis_prompt)
             seed = int(time.time()) % 100000
-            url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=880&nologo=true&seed={seed}&model=flux"
+            url = f"https://image.pollinations.ai/prompt/{encoded}?width=768&height=1024&nologo=true&nofeed=true&seed={seed}&model=flux"
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                img_bytes = resp.read()
-                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            with urllib.request.urlopen(req, timeout=18) as resp:
+                raw_bytes = resp.read()
+                clean_bytes = crop_watermark_bytes(raw_bytes)
+                img_b64 = base64.b64encode(clean_bytes).decode("utf-8")
         except Exception:
             img_b64 = None
 
     cover_meta = {
         "author": author_name,
-        "object": raw_obj[:22],
+        "object": raw_obj[:20],
         "subtitle": book_subtitle,
     }
     return img_b64, cover_meta
 
 
 def render_book_cover_html(img_b64, meta):
-    """생성된 맞춤형 흑백 크로키와 메타데이터를 조합해 문학 단행본 표지 HTML 렌더링"""
+    """완성된 흑백 크로키와 메타데이터를 조합해 문학 단행본 표지 HTML 렌더링"""
     if not meta:
         meta = {"author": "기록자", "object": "기억의 사물", "subtitle": "가지 않은 길의 기록"}
 
     if img_b64:
-        img_tag = f'<img src="data:image/jpeg;base64,{img_b64}" alt="Custom Croquis Cover">'
+        img_tag = f'<img src="data:image/jpeg;base64,{img_b64}" alt="Book Cover Illustration">'
     else:
-        # 네트워크 차단 등 최후의 경우에도 깨지지 않는 미니멀 펜슬 드로잉 SVG
         img_tag = """
         <svg viewBox="0 0 200 240" width="70%" height="70%" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="100" cy="120" r="62" stroke="#3a3228" stroke-width="1" stroke-dasharray="4 3"/>
@@ -683,7 +787,7 @@ def reset_all():
 
 
 # ─────────────────────────────────────────────────────────
-# [화면 A] 숭고한(Sublime) 건축적 무드의 입장 페이지
+# [화면 A] 숭고한(Sublime) 입장 페이지 (줄바꿈 교정 & 표지 스포일러 제거)
 # ─────────────────────────────────────────────────────────
 if not st.session_state.entered:
     intro_html = """
@@ -710,9 +814,12 @@ if not st.session_state.entered:
 다만 우리가 건너지 않은 강 건너편에서, 다른 이름으로 흐르고 있을 뿐이다.”
 </div>
 <div class="sublime-prose">
-한 사람의 생은 무수한 선택의 기록이자, 동시에 그만큼의 남겨진 가능성들의 총합입니다.<br><br>
-이 서재는 당신이 지나온 기억의 변곡점과 오래 간직한 사물, 그리고 미처 선택하지 않았던 열망을 바탕으로<br>
-<b>지금의 내가 걸어갈 미래</b>와 <b>다른 길을 택한 나</b>의 조우를 한 권의 단편소설과 크로키 표지로 기록합니다.
+한 사람의 생은 무수한 선택의 기록이자,<br class="desktop-br">
+동시에 그만큼 남겨진 가능성들의 총합입니다.<br><br>
+이 서재는 당신이 지나온 기억의 변곡점과 오래 간직한 사물,<br class="desktop-br">
+그리고 미처 선택하지 않았던 열망을 단서 삼아<br class="desktop-br">
+<b>지금의 내가 걸어갈 미래</b>와 <b>다른 길을 택한 나</b>의 조우를<br class="desktop-br">
+한 편의 단편소설로 기록합니다.
 </div>
 <div class="pillar-grid">
 <div class="pillar-item">
@@ -733,7 +840,7 @@ if not st.session_state.entered:
 </div>
 <div class="sublime-notice">
 • 총 6개 장(23개 문항)으로 이루어져 있으며, <b>최소 절반(50%) 이상의 문항</b>을 채워주셔야 집필이 시작됩니다.<br>
-• 추상적인 단어보다 <b>구체적인 사물의 형태, 계절의 공기, 공간의 소리와 촉감</b>을 적어주실수록 정교한 표지 크로키와 단편소설이 완성됩니다.<br>
+• 추상적인 단어보다 <b>구체적인 사물의 형태, 계절의 공기, 공간의 소리와 촉감</b>을 적어주실수록 밀도 높은 단편소설이 완성됩니다.<br>
 • 모든 응답은 소설 생성 즉시 휘발되며 별도로 저장되지 않습니다.
 </div>
 </div>
@@ -768,7 +875,6 @@ else:
         )
         st.caption("재생 버튼을 누르면 설문을 작성하는 동안 잔잔한 배경음악이 흐릅니다.")
 
-    # 잘림 없는 로마자 네비게이션
     PART_TITLES = [
         "I. 기본",
         "II. 성향",
@@ -876,7 +982,7 @@ else:
         st.subheader("PART 2. 나를 만든 기억과 선택")
         st.text_area("11. [변곡점] 지금의 나를 만든 과거의 한 장면과 그 이후의 변화는?", key="p2_q11")
         st.text_area("12. [성취의 기억] 스스로가 가장 자랑스러웠던 순간과 그 이유는?", key="p2_q12")
-        st.text_input("13. [내면의 오브제] 오랫동안 간직하고 있는 물건과 그 기억은? (표지 크로키의 모티프가 됩니다)", placeholder="예: 오래된 편지, 여행지 기념품, 낡은 필름 카메라", key="p2_q13")
+        st.text_input("13. [내면의 오브제] 오랫동안 간직하고 있는 물건과 그 기억은?", placeholder="예: 오래된 편지, 여행지 기념품, 낡은 필름 카메라", key="p2_q13")
         st.selectbox("14. [성장의 흔적] 과거와 비교해 가장 크게 달라진 점은?", [
             "A. 삶에서 중요하게 생각하는 가치", "B. 사람들과 관계를 맺는 방식",
             "C. 실패와 도전을 받아들이는 태도", "D. 꿈과 미래에 대한 생각", "E. 감정을 표현하고 다루는 방식"
@@ -923,7 +1029,7 @@ else:
                 go_to_step(step + 1)
                 st.rerun()
         else:
-            if st.button("📖 가능세계의 기록과 표지 펼치기", type="primary", use_container_width=True):
+            if st.button("🕯️ 나의 가능세계 기록 펼치기", type="primary", use_container_width=True):
                 if not check_part0_other_job_valid():
                     st.warning(
                         "⚠️ **PART 0의 '4. 현재 하고 있는 일'**에서 **'기타'**를 선택하셨으나 내용을 입력하지 않으셨습니다. "
@@ -942,7 +1048,7 @@ else:
                         st.session_state.generate_trigger = True
 
     # ─────────────────────────────────────────────────────────
-    # 맞춤형 크로키 표지 생성 ➔ 실시간 소설 타자기 출력
+    # 백그라운드 맞춤형 표지 준비 ➔ 서프라이즈 표지 공개 및 실시간 소설 집필
     # ─────────────────────────────────────────────────────────
     if st.session_state.generate_trigger:
         st.session_state.generate_trigger = False
@@ -963,22 +1069,20 @@ else:
         [PART 5] 첫질문(P5_Q22): {s.p5_q22} / 공통점(P5_Q23): {s.p5_q23}
         """
 
-        status_box = st.status("🖋️ 당신의 기억과 오브제를 바탕으로 표지 크로키와 소설을 준비하고 있습니다...", expanded=True)
+        status_box = st.status("🕯️ 가능세계의 시공간을 조율하고 있습니다...", expanded=True)
         stage_text = status_box.empty()
-        stage_prog = status_box.progress(10)
+        stage_prog = status_box.progress(12)
+        stage_text.write("🔍 **1단계:** 설문 응답을 바탕으로 내면의 성향과 기억의 조각을 분석하고 있습니다...")
 
-        # 1단계: 맞춤형 흑백 연필 크로키 표지 먼저 생성 및 화면 상단 배치
-        stage_text.write(f"✏️ **표지 드로잉:** 기억의 매개체('{s.p2_q13 or '오래된 사물'}')를 흑백 연필 크로키 표지로 스케치하고 있습니다...")
         cover_holder = st.empty()
         novel_area = st.empty()
 
+        # 스포일러 없이 백그라운드에서 맞춤형 표지 준비
         cover_b64, cover_meta = generate_custom_croquis_cover(s)
         st.session_state.cover_b64 = cover_b64
         st.session_state.cover_meta = cover_meta
-        cover_holder.markdown(render_book_cover_html(cover_b64, cover_meta), unsafe_allow_html=True)
 
-        stage_prog.progress(25)
-        stage_text.write("🔍 **서사 분석:** 설문 응답을 바탕으로 내면의 성향과 기억의 조각을 분석하고 있습니다...")
+        stage_prog.progress(28)
 
         full_text = ""
         displayed_len = 0
@@ -1003,26 +1107,31 @@ else:
                         if ("아키타입" in full_text or "구조" in full_text) and current_stage < 2:
                             current_stage = 2
                             stage_prog.progress(45)
-                            stage_text.write("📐 **구조 설계:** 두 세계가 교차할 서사 구조와 목차를 설계하고 있습니다...")
+                            stage_text.write("📐 **2단계:** 두 세계가 교차할 서사 구조와 목차를 설계하고 있습니다...")
                         elif "굴절" in full_text and current_stage < 3:
                             current_stage = 3
                             stage_prog.progress(65)
-                            stage_text.write("🎨 **심상 치환:** 현실의 기억과 단어를 문학적 비유로 굴절시키는 중입니다...")
+                            stage_text.write("🎨 **3단계:** 현실의 기억과 단어를 문학적 비유로 굴절시키는 중입니다...")
                         elif ("습관" in full_text or "무의식" in full_text) and current_stage < 4:
                             current_stage = 4
                             stage_prog.progress(80)
-                            stage_text.write("👤 **인물 조형:** 두 세계의 나를 잇는 무의식적 습관과 태도를 다듬는 중입니다...")
+                            stage_text.write("👤 **4단계:** 두 세계의 나를 잇는 무의식적 습관과 태도를 다듬는 중입니다...")
                         elif ("오브제" in full_text or "엔딩" in full_text) and current_stage < 5:
                             current_stage = 5
                             stage_prog.progress(92)
-                            stage_text.write(f"🕰️ **장면 조율:** '{s.p2_q13 or '기억의 오브제'}'에 흐른 세월과 마지막 장면을 조율하고 있습니다...")
+                            stage_text.write(f"🕰️ **5단계:** '{s.p2_q13 or '기억의 오브제'}'에 흐른 세월과 마지막 장면을 조율하고 있습니다...")
 
+                    # 소설 본문이 시작되는 순간 서프라이즈로 표지를 먼저 짠! 하고 띄운 뒤 본문 타이핑
                     if "[소설시작]" in full_text:
                         if not is_started:
                             is_started = True
                             stage_prog.progress(100)
-                            stage_text.write("✍️ **집필 시작:** 표지 아래 원고지 위에 가능세계의 기록을 적어 내려갑니다.")
+                            stage_text.write("✍️ **집필 시작:** 원고지 위에 가능세계의 기록을 적어 내려갑니다.")
                             status_box.update(label="✍️ 단편소설을 집필 중입니다...", state="running", expanded=False)
+                            cover_holder.markdown(
+                                render_book_cover_html(cover_b64, cover_meta),
+                                unsafe_allow_html=True,
+                            )
 
                         novel_body = full_text.split("[소설시작]", 1)[1].lstrip()
 
@@ -1043,12 +1152,16 @@ else:
             else:
                 final_novel = full_text.strip()
                 design_note = ""
+                cover_holder.markdown(
+                    render_book_cover_html(cover_b64, cover_meta),
+                    unsafe_allow_html=True,
+                )
 
             novel_area.markdown(
                 f'<div class="novel-box">{final_novel}</div>',
                 unsafe_allow_html=True,
             )
-            status_box.update(label="✨ 나만의 크로키 표지와 가능세계의 기록이 완성되었습니다.", state="complete", expanded=False)
+            status_box.update(label="✨ 가능세계의 기록이 완성되었습니다.", state="complete", expanded=False)
 
             st.session_state.novel_result = final_novel
             st.session_state.design_note = design_note
@@ -1076,7 +1189,7 @@ else:
         st.markdown("---")
         res_col1, res_col2 = st.columns(2)
         with res_col1:
-            if st.button("🔄 같은 답변으로 다른 표지·가능세계 다시 열기", use_container_width=True):
+            if st.button("🔄 같은 답변으로 다른 가능세계 다시 열기", use_container_width=True):
                 st.session_state.generate_trigger = True
                 st.rerun()
         with res_col2:
