@@ -1,6 +1,9 @@
 # app.py
+import base64
 import re
 import time
+import urllib.parse
+import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
 from google import genai
@@ -8,280 +11,367 @@ from google.genai import types
 from prompts import SYSTEM_PROMPT
 
 # 1. 페이지 기본 설정
-st.set_page_config(page_title="나의 가능세계 | 가능세계 서재 - AI 평행우주 단편소설", page_icon="📖", layout="centered")
+st.set_page_config(
+    page_title="나의 가능세계 | 가능세계 서재 - AI 평행우주 단편소설",
+    page_icon="📖",
+    layout="centered",
+)
 
-# 2. 어두운 등불 & 시네마틱 고서 테마 CSS + 좌측 상단 단독 픽토그램 스타일
+# 2. 숭고한(Sublime) 다크 아카이브 & 맞춤형 크로키 북커버 CSS
 st.markdown("""
 <style>
 @import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
 
-/* Streamlit 기본 상단 헤더 배경 투명화 (픽토그램 잘림 방지) */
 header[data-testid="stHeader"] {
     background: transparent !important;
 }
 
-/* 등불 일렁임 애니메이션 */
-@keyframes candleFlicker {
-    0%, 100% { opacity: 0.92; transform: scale(1); filter: drop-shadow(0 0 12px rgba(212, 154, 73, 0.6)); }
-    50% { opacity: 1; transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(235, 175, 85, 0.9)); }
+@keyframes slowPulse {
+    0%, 100% { opacity: 0.75; }
+    50% { opacity: 1; }
 }
 
-@keyframes floatSlow {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(4px); }
-}
-
-@keyframes fadeInSlow {
-    from { opacity: 0; transform: translateY(12px); }
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 전체 배경: 어두운 서재 + 상단 등불 후광 */
+/* 전체 배경: 칠흑 같은 어둠 위로 수직으로 떨어지는 한 줄기 천창(Chiaroscuro) 빛 */
 .stApp {
-    background-color: #0b0907;
+    background-color: #070605;
     background-image: 
-        radial-gradient(circle at 50% 8%, rgba(212, 154, 73, 0.18) 0%, rgba(11, 9, 7, 0.97) 60%),
-        repeating-linear-gradient(45deg, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 2px, transparent 2px, transparent 4px);
+        radial-gradient(ellipse 38% 55% at 50% 0%, rgba(212, 175, 115, 0.14) 0%, rgba(18, 14, 10, 0.45) 55%, rgba(7, 6, 5, 1) 100%);
     color: #e6dfd5;
     font-family: 'MaruBuri', serif;
 }
 
-/* 기본 타이포그래피 명조체 통일 */
 h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label, .stSelectbox label, .stTextInput label, .stTextArea label, .stNumberInput label, .stMultiSelect label {
     font-family: 'MaruBuri', serif !important;
     color: #e6dfd5 !important;
 }
 
-/* 화면 왼쪽 위 고정 소설책 단독 픽토그램 (잘림 방지 및 텍스트 제거) */
+/* 상단 네비게이션 버튼 '...' 잘림 완벽 방지 */
+div[data-testid="stHorizontalBlock"] button {
+    padding: 0.45rem 0.2rem !important;
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+    letter-spacing: -0.3px !important;
+    min-height: 38px !important;
+}
+
+/* 좌측 상단 미니멀 고서 엠블럼 */
 .top-left-book-emblem {
     position: fixed;
-    top: 72px;
+    top: 68px;
     left: 32px;
     z-index: 999999;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 54px;
-    height: 54px;
-    background: linear-gradient(135deg, rgba(26, 21, 16, 0.92) 0%, rgba(15, 12, 9, 0.88) 100%);
-    border: 1px solid rgba(200, 150, 75, 0.45);
-    border-radius: 10px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8), 0 0 18px rgba(200, 150, 75, 0.15);
+    width: 48px;
+    height: 48px;
+    background: rgba(14, 12, 10, 0.85);
+    border: 1px solid rgba(198, 163, 106, 0.35);
+    border-radius: 50%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
     pointer-events: none;
-    animation: floatSlow 5s infinite ease-in-out;
 }
 
 .top-left-book-emblem svg {
-    width: 34px;
-    height: 34px;
+    width: 24px;
+    height: 24px;
     overflow: visible;
-    filter: drop-shadow(0 0 8px rgba(212, 154, 73, 0.5));
 }
 
-/* 모바일 등 좁은 화면에서는 상단 인라인 아이콘으로 전환 */
 @media (max-width: 1100px) {
     .top-left-book-emblem {
         position: relative;
         top: 0;
         left: 0;
-        margin-top: 8px;
-        margin-bottom: 14px;
+        margin-top: 6px;
+        margin-bottom: 12px;
     }
 }
 
-/* 입장 페이지 전체 래퍼 */
-.intro-wrapper {
-    background: #120f0c;
-    border: 1px solid #3d3020;
-    border-top: 2px solid #c8964b;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-top: 15px;
-    margin-bottom: 25px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(200, 150, 75, 0.08);
-    animation: fadeInSlow 1.2s ease-out;
+/* ─────────────────────────────────────────────────────────
+   입장 페이지: 숭고한(Sublime) 모놀리스 & 건축적 여백 디자인
+   ───────────────────────────────────────────────────────── */
+.sublime-wrapper {
+    position: relative;
+    background: linear-gradient(180deg, rgba(16, 14, 12, 0.95) 0%, rgba(9, 8, 7, 0.98) 100%);
+    border: 1px solid rgba(198, 163, 106, 0.28);
+    padding: 10px;
+    margin-top: 18px;
+    margin-bottom: 28px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.95);
+    animation: fadeInUp 1.1s ease-out;
 }
 
-/* 상단 히어로 배너 이미지 */
-.hero-banner {
+.sublime-inner-frame {
+    border: 1px solid rgba(198, 163, 106, 0.14);
+    padding: 0 0 48px 0;
+}
+
+/* 상단 건축적 아치 & 빛의 회랑 비주얼 */
+.sublime-hero {
     position: relative;
     width: 100%;
-    height: 310px;
-    background-image: 
-        linear-gradient(to bottom, rgba(18, 15, 12, 0.25) 0%, rgba(18, 15, 12, 0.65) 65%, #120f0c 100%),
-        radial-gradient(circle at 50% 45%, rgba(225, 165, 75, 0.25) 0%, rgba(0, 0, 0, 0.7) 85%),
-        url('https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=1200&q=80');
+    height: 360px;
+    background-image:
+        linear-gradient(to bottom, rgba(7, 6, 5, 0.35) 0%, rgba(11, 9, 8, 0.72) 70%, #0b0908 100%),
+        url('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=85');
     background-size: cover;
     background-position: center;
+    filter: grayscale(45%) contrast(110%);
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: center;
     align-items: center;
-    padding-bottom: 20px;
     text-align: center;
+    padding: 0 24px;
 }
 
-.lantern-icon {
-    font-size: 2.6rem;
-    margin-bottom: 6px;
-    animation: candleFlicker 3.5s infinite ease-in-out;
+/* 두 궤적의 교차를 상징하는 기하학 아스트롤라베 선화 */
+.sacred-geometry {
+    margin-bottom: 22px;
+    animation: slowPulse 5s infinite ease-in-out;
 }
 
-.intro-title {
-    font-size: 2.35rem;
-    font-weight: 700;
-    color: #f6e7c1 !important;
-    letter-spacing: 3px;
-    margin-bottom: 4px;
-    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 18px rgba(212, 154, 73, 0.5);
+.sublime-kicker {
+    font-size: 0.72rem;
+    letter-spacing: 5px;
+    color: #b89f78 !important;
+    text-transform: uppercase;
+    margin-bottom: 14px;
 }
 
-.intro-subtitle {
-    font-size: 0.95rem;
-    color: #c5b092 !important;
-    letter-spacing: 1.5px;
-    font-style: italic;
+.sublime-title {
+    font-size: 2.5rem;
+    font-weight: 400;
+    color: #f4ece0 !important;
+    letter-spacing: 7px;
+    margin-bottom: 12px;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
 }
 
-.intro-content {
-    padding: 15px 38px 40px 38px;
+.sublime-divider {
+    width: 1px;
+    height: 42px;
+    background: linear-gradient(to bottom, rgba(198, 163, 106, 0.7), transparent);
+    margin: 18px auto;
+}
+
+.sublime-body-section {
+    padding: 10px 46px 0 46px;
     text-align: center;
-}
-
-.epigraph-box {
-    margin: 10px auto 30px auto;
-    padding: 14px 20px;
-    max-width: 88%;
-    border-top: 1px solid rgba(200, 150, 75, 0.25);
-    border-bottom: 1px solid rgba(200, 150, 75, 0.25);
-    color: #b8a68e !important;
-    font-size: 0.95rem;
-    line-height: 1.85;
-    font-style: italic;
-}
-
-.intro-body {
-    font-size: 1.02rem;
-    color: #ddd4c7 !important;
-    line-height: 2.05;
-    margin-bottom: 32px;
-    word-break: keep-all;
-}
-
-/* 3단 비주얼 무드 카드 */
-.mood-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 32px;
 }
 
 @media (max-width: 640px) {
-    .mood-grid {
-        grid-template-columns: 1fr;
+    .sublime-body-section {
+        padding: 10px 22px 0 22px;
+    }
+    .sublime-title {
+        font-size: 1.9rem;
+        letter-spacing: 4px;
     }
 }
 
-.mood-card {
-    background: #191410;
-    border: 1px solid #33281b;
-    border-radius: 6px;
-    overflow: hidden;
-    text-align: left;
-    transition: transform 0.25s ease, border-color 0.25s ease;
+.sublime-epigraph {
+    font-size: 1.02rem;
+    color: #d6c8b4 !important;
+    line-height: 2.1;
+    letter-spacing: 0.4px;
+    margin: 0 auto 36px auto;
+    max-width: 520px;
+    font-weight: 300;
 }
 
-.mood-card:hover {
-    transform: translateY(-3px);
-    border-color: #9e7336;
-}
-
-.mood-img {
-    width: 100%;
-    height: 115px;
-    object-fit: cover;
-    filter: sepia(28%) contrast(105%) brightness(78%);
-    border-bottom: 1px solid #2e2418;
-}
-
-.mood-text-wrap {
-    padding: 12px 14px;
-}
-
-.mood-step {
-    font-size: 0.75rem;
-    color: #c8964b !important;
-    letter-spacing: 1px;
-    margin-bottom: 3px;
-}
-
-.mood-heading {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #efe5d5 !important;
-    margin-bottom: 5px;
-}
-
-.mood-desc {
-    font-size: 0.82rem;
-    color: #a89984 !important;
-    line-height: 1.55;
+.sublime-prose {
+    font-size: 0.96rem;
+    color: #aba090 !important;
+    line-height: 2.15;
+    max-width: 540px;
+    margin: 0 auto 44px auto;
     word-break: keep-all;
 }
 
-.intro-guide {
-    background-color: rgba(200, 150, 75, 0.06);
-    border: 1px solid rgba(200, 150, 75, 0.2);
-    border-left: 3px solid #c8964b;
-    padding: 16px 22px;
-    text-align: left;
-    font-size: 0.9rem;
-    color: #cbbba6 !important;
-    border-radius: 4px;
-    line-height: 1.8;
+/* 3단 아카이브 필러 (과장 없이 절제된 타이포그래피 그리드) */
+.pillar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin: 0 auto 40px auto;
+    border-top: 1px solid rgba(198, 163, 106, 0.18);
+    border-bottom: 1px solid rgba(198, 163, 106, 0.18);
+    padding: 28px 10px;
 }
 
-/* 입력창 다크 브라운 & 금빛 테두리 스타일링 */
+@media (max-width: 640px) {
+    .pillar-grid {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+}
+
+.pillar-item {
+    text-align: center;
+    padding: 0 8px;
+}
+
+.pillar-num {
+    font-size: 0.72rem;
+    letter-spacing: 3px;
+    color: #b89867 !important;
+    margin-bottom: 8px;
+}
+
+.pillar-title {
+    font-size: 0.95rem;
+    color: #ebe2d5 !important;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.pillar-desc {
+    font-size: 0.82rem;
+    color: #8f8475 !important;
+    line-height: 1.7;
+    word-break: keep-all;
+}
+
+.sublime-notice {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 18px 24px;
+    background: rgba(255, 255, 255, 0.015);
+    border-left: 2px solid rgba(198, 163, 106, 0.5);
+    text-align: left;
+    font-size: 0.85rem;
+    color: #9e9283 !important;
+    line-height: 1.85;
+}
+
+/* ─────────────────────────────────────────────────────────
+   맞춤형 흑백 연필 크로키 단행본 표지 (Custom Book Cover)
+   ───────────────────────────────────────────────────────── */
+.book-cover-outer {
+    max-width: 440px;
+    margin: 28px auto 38px auto;
+    background-color: #efebe1;
+    background-image: 
+        radial-gradient(circle at center, transparent 55%, rgba(120, 105, 82, 0.18) 100%),
+        linear-gradient(90deg, rgba(60, 48, 35, 0.16) 0%, rgba(60, 48, 35, 0.03) 5%, transparent 12%);
+    padding: 18px;
+    border-radius: 3px 7px 7px 3px;
+    border-left: 7px solid #3a3127;
+    box-shadow: 0 28px 65px rgba(0, 0, 0, 0.92), 0 0 1px rgba(255, 255, 255, 0.2);
+    animation: fadeInUp 1.1s ease-out;
+}
+
+.book-cover-inner {
+    border: 1px solid #9c8f7a;
+    padding: 28px 24px 24px 24px;
+    text-align: center;
+    position: relative;
+}
+
+.book-series-label {
+    font-size: 0.65rem;
+    letter-spacing: 3.5px;
+    color: #6b5f4f !important;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.book-cover-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #1f1b16 !important;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+}
+
+.book-cover-sub {
+    font-size: 0.82rem;
+    color: #5c5143 !important;
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+.croquis-frame {
+    width: 100%;
+    aspect-ratio: 3 / 3.6;
+    background-color: #efeae0;
+    border: 1px solid #b8ad9b;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.croquis-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* 어떤 이미지든 종이 위에 그린 흑백 연필/목탄 크로키 질감으로 변환 */
+    filter: grayscale(100%) contrast(135%) brightness(103%);
+    mix-blend-mode: multiply;
+}
+
+.book-cover-footer {
+    border-top: 1px solid #c4b9a5;
+    padding-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.76rem;
+    color: #4f4639 !important;
+    letter-spacing: 0.8px;
+}
+
+/* 입력창 & 버튼 스타일 */
 input, textarea, [data-baseweb="select"] > div {
-    background-color: #181410 !important;
+    background-color: #12100d !important;
     color: #f0e9df !important;
-    border: 1px solid #3a3025 !important;
+    border: 1px solid #2e261d !important;
     font-family: 'MaruBuri', serif !important;
 }
 
 input:focus, textarea:focus {
-    border-color: #c8964b !important;
-    box-shadow: 0 0 8px rgba(200, 150, 75, 0.3) !important;
+    border-color: #b89867 !important;
+    box-shadow: 0 0 8px rgba(184, 152, 103, 0.25) !important;
 }
 
-/* 버튼 스타일: 등불 빛깔의 앤티크 골드 */
 button[kind="primary"] {
-    background: linear-gradient(135deg, #b8863e 0%, #82571d 100%) !important;
+    background: linear-gradient(135deg, #9e7b47 0%, #6e5023 100%) !important;
     color: #fffaf0 !important;
-    border: 1px solid #d4a75d !important;
+    border: 1px solid #c49f66 !important;
     font-weight: 600 !important;
+    letter-spacing: 1px !important;
     padding: 0.65rem 1.2rem !important;
-    box-shadow: 0 4px 18px rgba(184, 134, 62, 0.3) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
     transition: all 0.25s ease !important;
 }
 
 button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #cc984a 0%, #9c6b27 100%) !important;
-    box-shadow: 0 6px 24px rgba(212, 167, 93, 0.5) !important;
+    background: linear-gradient(135deg, #b38d54 0%, #82602b 100%) !important;
+    box-shadow: 0 6px 24px rgba(196, 159, 102, 0.35) !important;
 }
 
 button[kind="secondary"] {
-    background-color: #1b1713 !important;
-    color: #b8a996 !important;
-    border: 1px solid #382e23 !important;
+    background-color: #14110e !important;
+    color: #9e9181 !important;
+    border: 1px solid #2b241c !important;
 }
 
 button[kind="secondary"]:hover {
-    border-color: #8f6224 !important;
-    color: #f0e6d8 !important;
+    border-color: #8c6d3f !important;
+    color: #ebe2d5 !important;
 }
 
-/* 소설 출력 박스: 실제 빛바랜 소설책 종이 질감 */
+/* 소설 본문 출력 박스 */
 .novel-box {
     font-family: 'MaruBuri', serif;
     background-color: #f3ecdf;
@@ -297,7 +387,7 @@ button[kind="secondary"]:hover {
         0 15px 45px rgba(0, 0, 0, 0.85);
     line-height: 2.05;
     font-size: 1.06rem;
-    margin-top: 25px;
+    margin-top: 15px;
     white-space: pre-wrap;
     word-break: keep-all;
 }
@@ -307,19 +397,11 @@ button[kind="secondary"]:hover {
 }
 </style>
 
-<!-- 화면 왼쪽 위 고정 소설책 단독 픽토그램 -->
+<!-- 좌측 상단 미니멀 고서 픽토그램 -->
 <div class="top-left-book-emblem">
     <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#e2b86b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="rgba(200, 150, 75, 0.14)"/>
-        <path d="M32 16V52" stroke="#e2b86b" stroke-width="2.2" stroke-linecap="round"/>
-        <path d="M12 22C17 20.5 23 21 27 23.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M12 30C17 28.5 23 29 27 31.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M12 38C17 36.5 23 37 27 39.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M52 22C47 20.5 41 21 37 23.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M52 30C47 28.5 41 29 37 31.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M52 38C47 36.5 41 37 37 39.5" stroke="#c8964b" stroke-width="1.6" stroke-linecap="round"/>
-        <circle cx="32" cy="8" r="2.2" fill="#f6e7c1"/>
-        <path d="M32 3V5M26 7L28 8M38 7L36 8" stroke="#f6e7c1" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M32 16C25 11 14 10 6 13V49C14 46 25 47 32 52C39 47 50 46 58 49V13C50 10 39 11 32 16Z" stroke="#c8a46e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M32 16V52" stroke="#c8a46e" stroke-width="2" stroke-linecap="round"/>
     </svg>
 </div>
 """, unsafe_allow_html=True)
@@ -327,7 +409,7 @@ button[kind="secondary"]:hover {
 # 3. 제미나이 클라이언트 연결
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 4. 세션 상태 초기화 (p0_q4_custom 포함)
+# 4. 세션 상태 초기화
 DEFAULT_KEYS = {
     "p0_q1": "", "p0_q2": 25, "p0_q3": None, "p0_q4_type": None,
     "p0_q4_custom": "", "p0_q4_detail": "", "p0_q5": "", "p0_q6": "", "p0_q7": "",
@@ -358,6 +440,10 @@ if "novel_result" not in st.session_state:
     st.session_state.novel_result = None
 if "design_note" not in st.session_state:
     st.session_state.design_note = None
+if "cover_b64" not in st.session_state:
+    st.session_state.cover_b64 = None
+if "cover_meta" not in st.session_state:
+    st.session_state.cover_meta = None
 if "step_warning" not in st.session_state:
     st.session_state.step_warning = None
 
@@ -370,10 +456,122 @@ if st.session_state.scroll_to_top:
 
 
 # ─────────────────────────────────────────────────────────
+# 맞춤형 흑백 연필 크로키 표지 실시간 생성 함수
+# ─────────────────────────────────────────────────────────
+def generate_custom_croquis_cover(s):
+    """사용자의 핵심 오브제(p2_q13)와 서사 분위기를 추출해 맞춤형 흑백 연필 크로키 표지를 생성"""
+    raw_obj = s.p2_q13.strip() if s.p2_q13 and s.p2_q13.strip() else "오래된 회중시계와 열쇠"
+    raw_mood = s.p4_q18.strip() if s.p4_q18 and s.p4_q18.strip() else "안개 낀 밤의 갈림길"
+    author_name = s.p0_q1.strip() if s.p0_q1 and s.p0_q1.strip() else "무명(無名)"
+
+    # 1. 제미나이로 사용자의 오브제를 영문 크로키 드로잉 지시문과 짧은 부제로 변환
+    subject_en = "a vintage object resting on an old wooden desk by a quiet window"
+    book_subtitle = f"{raw_obj[:18]}에 스민 두 개의 시간"
+    try:
+        meta_res = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=(
+                f"사용자의 기억 속 물건은 '{raw_obj}', 다른 삶의 풍경은 '{raw_mood}'입니다.\n"
+                f"1줄째에는 이 물건을 중심으로 한 정물/배경 흑백 연필 크로키용 영문 묘사(20단어 이내, 글자/텍스트 절대 제외)를 적고,\n"
+                f"2줄째에는 단행본 표지에 들어갈 품격 있고 절제된 한국어 부제(15자 이내)를 적어주세요.\n"
+                f"형식:\nEN: ...\nKO: ..."
+            ),
+        )
+        for line in meta_res.text.strip().splitlines():
+            if line.startswith("EN:"):
+                subject_en = line.replace("EN:", "").strip()
+            elif line.startswith("KO:"):
+                book_subtitle = line.replace("KO:", "").strip()
+    except Exception:
+        pass
+
+    croquis_prompt = (
+        f"Minimalist black and white rough pencil croquis sketch on aged cream paper, "
+        f"expressive graphite line drawing, fine hatching, contours and raw pencil strokes, "
+        f"literary novel illustration, centered single subject with generous blank paper space, "
+        f"strictly no text, no letters, no words, no signature. Subject: {subject_en}"
+    )
+
+    img_b64 = None
+
+    # 2. 1차 시도: Google Imagen 3 API 호출
+    try:
+        img_res = client.models.generate_images(
+            model="imagen-3.0-generate-002",
+            prompt=croquis_prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="3:4",
+                output_mime_type="image/jpeg",
+            ),
+        )
+        if img_res.generated_images:
+            img_bytes = img_res.generated_images[0].image.image_bytes
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+    except Exception:
+        pass
+
+    # 3. 2차 자동 폴백: Imagen 모델 권한 제한 시 즉시 크로키 스케치 엔진으로 생성
+    if not img_b64:
+        try:
+            encoded = urllib.parse.quote(croquis_prompt)
+            seed = int(time.time()) % 100000
+            url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=880&nologo=true&seed={seed}&model=flux"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                img_bytes = resp.read()
+                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        except Exception:
+            img_b64 = None
+
+    cover_meta = {
+        "author": author_name,
+        "object": raw_obj[:22],
+        "subtitle": book_subtitle,
+    }
+    return img_b64, cover_meta
+
+
+def render_book_cover_html(img_b64, meta):
+    """생성된 맞춤형 흑백 크로키와 메타데이터를 조합해 문학 단행본 표지 HTML 렌더링"""
+    if not meta:
+        meta = {"author": "기록자", "object": "기억의 사물", "subtitle": "가지 않은 길의 기록"}
+
+    if img_b64:
+        img_tag = f'<img src="data:image/jpeg;base64,{img_b64}" alt="Custom Croquis Cover">'
+    else:
+        # 네트워크 차단 등 최후의 경우에도 깨지지 않는 미니멀 펜슬 드로잉 SVG
+        img_tag = """
+        <svg viewBox="0 0 200 240" width="70%" height="70%" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="120" r="62" stroke="#3a3228" stroke-width="1" stroke-dasharray="4 3"/>
+            <path d="M60 165 C85 110, 115 110, 140 75" stroke="#231e18" stroke-width="1.4"/>
+            <path d="M140 165 C115 110, 85 110, 60 75" stroke="#231e18" stroke-width="0.9" stroke-opacity="0.6"/>
+            <circle cx="100" cy="120" r="4" fill="#231e18"/>
+        </svg>
+        """
+
+    return f"""
+    <div class="book-cover-outer">
+        <div class="book-cover-inner">
+            <div class="book-series-label">ARCHIVE OF POSSIBLE WORLDS</div>
+            <div class="book-cover-title">나의 가능세계</div>
+            <div class="book-cover-sub">{meta['subtitle']}</div>
+            <div class="croquis-frame">
+                {img_tag}
+            </div>
+            <div class="book-cover-footer">
+                <span>MOTIF · {meta['object']}</span>
+                <span>{meta['author']}의 기록</span>
+            </div>
+        </div>
+    </div>
+    """
+
+
+# ─────────────────────────────────────────────────────────
 # 유효성 및 성실도(50% 이상) 검증 함수
 # ─────────────────────────────────────────────────────────
 def is_sincere_text(val, min_len=2):
-    """빈칸이거나 의미 없는 단답(ㅋㅋ, ㅇㅇ, 특수문자만 반복 등)인지 검사"""
     if not val or not isinstance(val, str):
         return False
     cleaned = val.strip()
@@ -387,7 +585,6 @@ def is_sincere_text(val, min_len=2):
 
 
 def check_part0_other_job_valid():
-    """'현재 하고 있는 일'에서 '기타'를 선택했을 때 직접 입력란을 채웠는지 검사"""
     if st.session_state.p0_q4_type == "기타":
         if not st.session_state.p0_q4_custom or not st.session_state.p0_q4_custom.strip():
             return False
@@ -395,9 +592,7 @@ def check_part0_other_job_valid():
 
 
 def evaluate_survey_sincerity():
-    """전체 핵심 문항의 성실 응답률 및 부족한 파트 계산"""
     s = st.session_state
-
     q4_valid = (
         is_sincere_text(s.p0_q4_custom, min_len=1)
         if s.p0_q4_type == "기타"
@@ -405,7 +600,7 @@ def evaluate_survey_sincerity():
     )
 
     part_checks = {
-        "PART 0. 기본": [
+        "I. 기본": [
             is_sincere_text(s.p0_q1, min_len=1),
             s.p0_q3 is not None,
             q4_valid,
@@ -413,7 +608,7 @@ def evaluate_survey_sincerity():
             is_sincere_text(s.p0_q6, min_len=2),
             is_sincere_text(s.p0_q7, min_len=3),
         ],
-        "PART 1. 성향": [
+        "II. 성향": [
             s.p1_q1 is not None,
             s.p1_q2 is not None,
             s.p1_q3 is not None,
@@ -425,24 +620,24 @@ def evaluate_survey_sincerity():
             is_sincere_text(s.p1_q9, min_len=3),
             s.p1_q10 is not None,
         ],
-        "PART 2. 기억": [
+        "III. 기억": [
             is_sincere_text(s.p2_q11, min_len=4),
             is_sincere_text(s.p2_q12, min_len=4),
             is_sincere_text(s.p2_q13, min_len=2),
             s.p2_q14 is not None,
         ],
-        "PART 3. 현재 미래": [
+        "IV. 미래": [
             is_sincere_text(s.p3_q15, min_len=4),
             s.p3_q16 is not None,
             is_sincere_text(s.p3_q17, min_len=3),
         ],
-        "PART 4. 다른 길": [
+        "V. 다른 길": [
             is_sincere_text(s.p4_q18, min_len=4),
             is_sincere_text(s.p4_q19, min_len=2),
             s.p4_q20 is not None,
             s.p4_q21 is not None,
         ],
-        "PART 5. 조우": [
+        "VI. 조우": [
             is_sincere_text(s.p5_q22, min_len=3),
             is_sincere_text(s.p5_q23, min_len=2),
         ],
@@ -480,72 +675,74 @@ def reset_all():
     st.session_state.current_step = 0
     st.session_state.novel_result = None
     st.session_state.design_note = None
+    st.session_state.cover_b64 = None
+    st.session_state.cover_meta = None
     st.session_state.generate_trigger = False
     st.session_state.step_warning = None
     st.session_state.scroll_to_top = True
 
 
 # ─────────────────────────────────────────────────────────
-# [화면 A] 시네마틱 입장 페이지
+# [화면 A] 숭고한(Sublime) 건축적 무드의 입장 페이지
 # ─────────────────────────────────────────────────────────
 if not st.session_state.entered:
     intro_html = """
-<div class="intro-wrapper">
-<div class="hero-banner">
-<div class="lantern-icon">🕯️</div>
-<div class="intro-title">나의 가능세계</div>
-<div class="intro-subtitle">The Archive of Unchosen Paths</div>
+<div class="sublime-wrapper">
+<div class="sublime-inner-frame">
+<div class="sublime-hero">
+<div class="sacred-geometry">
+<svg width="68" height="68" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="34" cy="34" r="30" stroke="#c8a46e" stroke-width="0.7" stroke-opacity="0.55"/>
+<circle cx="26" cy="34" r="18" stroke="#e3c998" stroke-width="0.9" stroke-opacity="0.8"/>
+<circle cx="42" cy="34" r="18" stroke="#e3c998" stroke-width="0.9" stroke-opacity="0.8"/>
+<line x1="34" y1="0" x2="34" y2="68" stroke="#c8a46e" stroke-width="0.7" stroke-opacity="0.6"/>
+<circle cx="34" cy="21" r="2" fill="#f4ece0"/>
+<circle cx="34" cy="47" r="2" fill="#f4ece0"/>
+</svg>
 </div>
-<div class="intro-content">
-<div class="epigraph-box">
-“가보지 못한 길은 사라지지 않는다.<br>
-다만 우리가 뒤돌아보지 않는 시간 속에서 조용히 자라날 뿐이다.”
+<div class="sublime-kicker">THE ARCHIVE OF UNCHOSEN PATHS</div>
+<div class="sublime-title">나의 가능세계</div>
 </div>
-<div class="intro-body">
-우리는 매일 수많은 갈림길을 지나며 살아갑니다.<br>
-하나의 문을 열면 다른 문들은 소리 없이 닫히지만,<br>
-닫힌 문 너머의 시간 역시 어딘가에서 계속 흐르고 있을지 모릅니다.<br><br>
-이 서재는 당신의 성향과 오래된 기억, 그리고 미처 선택하지 못한 열망을 단서 삼아<br>
-<b>지금의 내가 걸어갈 미래</b>와 <b>다른 선택을 했다면 존재했을 나</b>를 한 편의 단편소설로 엮어냅니다.
+<div class="sublime-divider"></div>
+<div class="sublime-body-section">
+<div class="sublime-epigraph">
+“선택되지 않은 시간은 사라지지 않는다.<br>
+다만 우리가 건너지 않은 강 건너편에서, 다른 이름으로 흐르고 있을 뿐이다.”
 </div>
-<div class="mood-grid">
-<div class="mood-card">
-<img class="mood-img" src="https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?auto=format&fit=crop&w=600&q=80" alt="Object">
-<div class="mood-text-wrap">
-<div class="mood-step">ARCHIVE I</div>
-<div class="mood-heading">기억의 사물과 흔적</div>
-<div class="mood-desc">당신이 오래 간직한 물건과 버릇이 두 세계를 잇는 매개가 됩니다.</div>
+<div class="sublime-prose">
+한 사람의 생은 무수한 선택의 기록이자, 동시에 그만큼의 남겨진 가능성들의 총합입니다.<br><br>
+이 서재는 당신이 지나온 기억의 변곡점과 오래 간직한 사물, 그리고 미처 선택하지 않았던 열망을 바탕으로<br>
+<b>지금의 내가 걸어갈 미래</b>와 <b>다른 길을 택한 나</b>의 조우를 한 권의 단편소설과 크로키 표지로 기록합니다.
 </div>
+<div class="pillar-grid">
+<div class="pillar-item">
+<div class="pillar-num">I · OBJECT</div>
+<div class="pillar-title">기억의 사물</div>
+<div class="pillar-desc">오래 간직한 물건과 사소한 습관이 두 세계를 잇는 고유한 표식이 됩니다.</div>
 </div>
-<div class="mood-card">
-<img class="mood-img" src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=600&q=80" alt="Present">
-<div class="mood-text-wrap">
-<div class="mood-step">ARCHIVE II</div>
-<div class="mood-heading">지금의 궤적과 다른 길</div>
-<div class="mood-desc">현재의 치열한 일상과, 모든 제약을 벗어난 또 다른 가능성을 나란히 비춥니다.</div>
+<div class="pillar-item">
+<div class="pillar-num">II · DIVERGENCE</div>
+<div class="pillar-title">갈라진 시간</div>
+<div class="pillar-desc">현재의 연장선에 놓인 삶과, 다른 선택 너머의 삶을 나란히 비춥니다.</div>
 </div>
-</div>
-<div class="mood-card">
-<img class="mood-img" src="https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80" alt="Encounter">
-<div class="mood-text-wrap">
-<div class="mood-step">ARCHIVE III</div>
-<div class="mood-heading">경계에서의 조우</div>
-<div class="mood-desc">두 시간선이 스치듯 교차하며 서로에게 묻어두었던 질문을 건넵니다.</div>
+<div class="pillar-item">
+<div class="pillar-num">III · ENCOUNTER</div>
+<div class="pillar-title">경계의 조우</div>
+<div class="pillar-desc">두 시간선이 스치듯 교차하며 서로에게 묻어두었던 질문을 건넵니다.</div>
 </div>
 </div>
+<div class="sublime-notice">
+• 총 6개 장(23개 문항)으로 이루어져 있으며, <b>최소 절반(50%) 이상의 문항</b>을 채워주셔야 집필이 시작됩니다.<br>
+• 추상적인 단어보다 <b>구체적인 사물의 형태, 계절의 공기, 공간의 소리와 촉감</b>을 적어주실수록 정교한 표지 크로키와 단편소설이 완성됩니다.<br>
+• 모든 응답은 소설 생성 즉시 휘발되며 별도로 저장되지 않습니다.
 </div>
-<div class="intro-guide">
-<b>📖 기록을 시작하기 전에</b><br>
-• 총 6개 파트(23개 문항)로 구성되어 있으며, <b>최소 절반(50%) 이상의 문항</b>을 성실히 채워주셔야 소설이 집필됩니다.<br>
-• 주관식 문항에 추상적인 표현 대신 <b>구체적인 장면, 소리, 냄새, 사물의 촉감</b>을 적어주실수록 밀도 높은 소설이 완성됩니다.<br>
-• 입력하신 모든 기록은 소설 집필 즉시 휘발되며 서버에 저장되지 않습니다.
 </div>
 </div>
 </div>
 """
     st.markdown(intro_html, unsafe_allow_html=True)
 
-    if st.button("🕯️ 등불을 켜고 서재로 들어서기", type="primary", use_container_width=True):
+    if st.button("서재로 들어서기", type="primary", use_container_width=True):
         st.session_state.entered = True
         st.session_state.scroll_to_top = True
         st.rerun()
@@ -556,15 +753,14 @@ if not st.session_state.entered:
 else:
     top_col1, top_col2 = st.columns([3, 1])
     with top_col1:
-        st.title("📖 나의 가능세계")
+        st.title("나의 가능세계")
         st.caption("지금의 내가 계속 걸어간 미래와, 다른 선택을 했다면 존재했을 나")
     with top_col2:
-        if st.button("🚪 표지로 돌아가기", use_container_width=True):
+        if st.button("표지로 돌아가기", use_container_width=True):
             st.session_state.entered = False
             st.session_state.scroll_to_top = True
             st.rerun()
 
-    # BGM 플레이어 슬롯
     with st.expander("🎧 서재 배경음악 (BGM) 열기"):
         st.audio(
             "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3",
@@ -572,13 +768,14 @@ else:
         )
         st.caption("재생 버튼을 누르면 설문을 작성하는 동안 잔잔한 배경음악이 흐릅니다.")
 
+    # 잘림 없는 로마자 네비게이션
     PART_TITLES = [
-        "PART 0. 기본",
-        "PART 1. 성향",
-        "PART 2. 기억",
-        "PART 3. 현재 미래",
-        "PART 4. 다른 길",
-        "PART 5. 조우",
+        "I. 기본",
+        "II. 성향",
+        "III. 기억",
+        "IV. 미래",
+        "V. 다른 길",
+        "VI. 조우",
     ]
 
     nav_cols = st.columns(6)
@@ -679,7 +876,7 @@ else:
         st.subheader("PART 2. 나를 만든 기억과 선택")
         st.text_area("11. [변곡점] 지금의 나를 만든 과거의 한 장면과 그 이후의 변화는?", key="p2_q11")
         st.text_area("12. [성취의 기억] 스스로가 가장 자랑스러웠던 순간과 그 이유는?", key="p2_q12")
-        st.text_input("13. [내면의 오브제] 오랫동안 간직하고 있는 물건과 그 기억은?", placeholder="예: 오래된 편지, 여행지 기념품, 낡은 카메라", key="p2_q13")
+        st.text_input("13. [내면의 오브제] 오랫동안 간직하고 있는 물건과 그 기억은? (표지 크로키의 모티프가 됩니다)", placeholder="예: 오래된 편지, 여행지 기념품, 낡은 필름 카메라", key="p2_q13")
         st.selectbox("14. [성장의 흔적] 과거와 비교해 가장 크게 달라진 점은?", [
             "A. 삶에서 중요하게 생각하는 가치", "B. 사람들과 관계를 맺는 방식",
             "C. 실패와 도전을 받아들이는 태도", "D. 꿈과 미래에 대한 생각", "E. 감정을 표현하고 다루는 방식"
@@ -717,16 +914,16 @@ else:
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         if step > 0:
-            if st.button("⬅️ 이전 파트로", use_container_width=True):
+            if st.button("⬅️ 이전 장으로", use_container_width=True):
                 go_to_step(step - 1)
                 st.rerun()
     with btn_col2:
         if step < 5:
-            if st.button(f"다음 파트로 이동 ({PART_TITLES[step + 1]}) ➡️", type="primary", use_container_width=True):
+            if st.button(f"다음 장으로 ({PART_TITLES[step + 1]}) ➡️", type="primary", use_container_width=True):
                 go_to_step(step + 1)
                 st.rerun()
         else:
-            if st.button("🕯️ 나의 가능세계 기록 펼치기", type="primary", use_container_width=True):
+            if st.button("📖 가능세계의 기록과 표지 펼치기", type="primary", use_container_width=True):
                 if not check_part0_other_job_valid():
                     st.warning(
                         "⚠️ **PART 0의 '4. 현재 하고 있는 일'**에서 **'기타'**를 선택하셨으나 내용을 입력하지 않으셨습니다. "
@@ -737,14 +934,16 @@ else:
                     if ratio < 0.5:
                         weak_str = ", ".join(weak_parts) if weak_parts else "전체 파트"
                         st.error(
-                            f"🕯️ **아직 가능세계의 문을 열기에 단서가 부족합니다.** (현재 성실 답변율: **{int(ratio * 100)}%** / 최소 **50%** 필요)\n\n"
-                            f"비어 있거나 너무 짧게(단답·자음 등) 작성된 문항이 많으면 소설이 생성되지 않습니다. "
-                            f"특히 **[{weak_str}]**의 빈칸이나 불성실한 답변을 조금만 더 구체적으로 채워주시길 부탁드립니다."
+                            f"**아직 가능세계의 기록을 엮기에 단서가 부족합니다.** (현재 성실 답변율: **{int(ratio * 100)}%** / 최소 **50%** 필요)\n\n"
+                            f"비어 있거나 단답으로 작성된 문항이 많으면 소설이 생성되지 않습니다. "
+                            f"특히 **[{weak_str}]**의 빈칸이나 짧은 답변을 조금만 더 구체적으로 채워주시길 부탁드립니다."
                         )
                     else:
                         st.session_state.generate_trigger = True
 
-    # 소설 생성 및 단계별 진행 표시 + 실시간 타자기 출력
+    # ─────────────────────────────────────────────────────────
+    # 맞춤형 크로키 표지 생성 ➔ 실시간 소설 타자기 출력
+    # ─────────────────────────────────────────────────────────
     if st.session_state.generate_trigger:
         st.session_state.generate_trigger = False
         s = st.session_state
@@ -764,12 +963,23 @@ else:
         [PART 5] 첫질문(P5_Q22): {s.p5_q22} / 공통점(P5_Q23): {s.p5_q23}
         """
 
-        status_box = st.status("🕯️ 등불 아래에서 가능세계의 문을 여는 중입니다...", expanded=True)
+        status_box = st.status("🖋️ 당신의 기억과 오브제를 바탕으로 표지 크로키와 소설을 준비하고 있습니다...", expanded=True)
         stage_text = status_box.empty()
         stage_prog = status_box.progress(10)
-        stage_text.write("🔍 **1단계:** 설문 응답을 바탕으로 내면의 성향과 기억의 조각을 분석하고 있습니다...")
 
+        # 1단계: 맞춤형 흑백 연필 크로키 표지 먼저 생성 및 화면 상단 배치
+        stage_text.write(f"✏️ **표지 드로잉:** 기억의 매개체('{s.p2_q13 or '오래된 사물'}')를 흑백 연필 크로키 표지로 스케치하고 있습니다...")
+        cover_holder = st.empty()
         novel_area = st.empty()
+
+        cover_b64, cover_meta = generate_custom_croquis_cover(s)
+        st.session_state.cover_b64 = cover_b64
+        st.session_state.cover_meta = cover_meta
+        cover_holder.markdown(render_book_cover_html(cover_b64, cover_meta), unsafe_allow_html=True)
+
+        stage_prog.progress(25)
+        stage_text.write("🔍 **서사 분석:** 설문 응답을 바탕으로 내면의 성향과 기억의 조각을 분석하고 있습니다...")
+
         full_text = ""
         displayed_len = 0
         is_started = False
@@ -792,27 +1002,27 @@ else:
                     if not is_started:
                         if ("아키타입" in full_text or "구조" in full_text) and current_stage < 2:
                             current_stage = 2
-                            stage_prog.progress(30)
-                            stage_text.write("📐 **2단계:** 두 세계가 교차할 서사 구조와 목차를 설계하고 있습니다...")
+                            stage_prog.progress(45)
+                            stage_text.write("📐 **구조 설계:** 두 세계가 교차할 서사 구조와 목차를 설계하고 있습니다...")
                         elif "굴절" in full_text and current_stage < 3:
                             current_stage = 3
-                            stage_prog.progress(55)
-                            stage_text.write("🎨 **3단계:** 현실의 기억과 단어를 문학적 비유로 굴절시키는 중입니다...")
+                            stage_prog.progress(65)
+                            stage_text.write("🎨 **심상 치환:** 현실의 기억과 단어를 문학적 비유로 굴절시키는 중입니다...")
                         elif ("습관" in full_text or "무의식" in full_text) and current_stage < 4:
                             current_stage = 4
-                            stage_prog.progress(75)
-                            stage_text.write("👤 **4단계:** 두 세계의 나를 잇는 무의식적 습관과 캐릭터를 디자인하는 중입니다...")
+                            stage_prog.progress(80)
+                            stage_text.write("👤 **인물 조형:** 두 세계의 나를 잇는 무의식적 습관과 태도를 다듬는 중입니다...")
                         elif ("오브제" in full_text or "엔딩" in full_text) and current_stage < 5:
                             current_stage = 5
-                            stage_prog.progress(90)
-                            stage_text.write(f"🕰️ **5단계:** '{s.p2_q13 or '기억의 오브제'}'에 흐른 세월과 마지막 장면을 조율하고 있습니다...")
+                            stage_prog.progress(92)
+                            stage_text.write(f"🕰️ **장면 조율:** '{s.p2_q13 or '기억의 오브제'}'에 흐른 세월과 마지막 장면을 조율하고 있습니다...")
 
                     if "[소설시작]" in full_text:
                         if not is_started:
                             is_started = True
                             stage_prog.progress(100)
-                            stage_text.write("✍️ **집필 시작:** 오래된 원고지 위에 가능세계의 기록을 적어 내려갑니다.")
-                            status_box.update(label="✍️ 등불 아래에서 소설을 집필 중입니다...", state="running", expanded=False)
+                            stage_text.write("✍️ **집필 시작:** 표지 아래 원고지 위에 가능세계의 기록을 적어 내려갑니다.")
+                            status_box.update(label="✍️ 단편소설을 집필 중입니다...", state="running", expanded=False)
 
                         novel_body = full_text.split("[소설시작]", 1)[1].lstrip()
 
@@ -838,7 +1048,7 @@ else:
                 f'<div class="novel-box">{final_novel}</div>',
                 unsafe_allow_html=True,
             )
-            status_box.update(label="✨ 가능세계의 기록이 완성되었습니다.", state="complete", expanded=False)
+            status_box.update(label="✨ 나만의 크로키 표지와 가능세계의 기록이 완성되었습니다.", state="complete", expanded=False)
 
             st.session_state.novel_result = final_novel
             st.session_state.design_note = design_note
@@ -847,7 +1057,12 @@ else:
             status_box.update(label="⚠️ 생성 중 오류가 발생했습니다.", state="error", expanded=True)
             st.error(f"서버 응답 오류: {e}")
 
+    # 완성된 표지와 소설 본문 유지
     elif st.session_state.novel_result:
+        st.markdown(
+            render_book_cover_html(st.session_state.cover_b64, st.session_state.cover_meta),
+            unsafe_allow_html=True,
+        )
         st.markdown(
             f'<div class="novel-box">{st.session_state.novel_result}</div>',
             unsafe_allow_html=True,
@@ -855,13 +1070,13 @@ else:
 
     if st.session_state.novel_result:
         if st.session_state.design_note:
-            with st.expander("🔍 AI 서사 설계 노트 (작성 과정 보기)"):
+            with st.expander("🔍 서사 설계 노트 (작성 과정 보기)"):
                 st.text(st.session_state.design_note)
 
         st.markdown("---")
         res_col1, res_col2 = st.columns(2)
         with res_col1:
-            if st.button("🔄 같은 답변으로 다른 가능세계 다시 열기", use_container_width=True):
+            if st.button("🔄 같은 답변으로 다른 표지·가능세계 다시 열기", use_container_width=True):
                 st.session_state.generate_trigger = True
                 st.rerun()
         with res_col2:
