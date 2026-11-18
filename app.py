@@ -559,7 +559,7 @@ def generate_custom_croquis_cover(s):
             f"SUBTITLE_KO: [표지에 인쇄할 문학적이고 절제된 한국어 부제, 15자 이내]"
         )
         meta_res = client.models.generate_content(
-            model="gemini-4-carbon",
+            model="gemini-4-hydrogen",
             contents=prompt_for_visual,
         )
         res_text = meta_res.text.strip()
@@ -1091,7 +1091,7 @@ else:
 
         try:
             response_stream = client.models.generate_content_stream(
-                model="gemini-4-carbon",
+                model="gemini-4-hydrogen",
                 contents=user_data,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
